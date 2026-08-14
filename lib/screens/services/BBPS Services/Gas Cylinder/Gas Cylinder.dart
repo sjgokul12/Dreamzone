@@ -51,7 +51,7 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
   Future<void> _fetchOperators() async {
     if (mounted) setState(() { _operatorsLoading = true; _operatorsError = null; });
     try {
-      final res = await ApiService.fetchApi('/lpg/operators');
+      final res = await ApiService.fetchApi('/gas-cylinder/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final list = (data['operators'] as List<dynamic>)

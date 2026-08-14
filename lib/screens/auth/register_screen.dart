@@ -126,22 +126,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: Column(
                 children: [
                   // 1. Top Image Graphic
-                  SizedBox(
-                    height: size.height * 0.30,
-                    width: double.infinity,
-                    child: Image.asset(
-                      'assets/Create account.png',
-                      fit: BoxFit.contain,
-                      alignment: Alignment.center,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: kBgBottom,
-                          child: const Center(
-                            child: Icon(Icons.image_not_supported, size: 50, color: kMutedText),
+                  Stack(
+                    children: [
+                      SizedBox(
+                        height: size.height * 0.30,
+                        width: double.infinity,
+                        child: Image.asset(
+                          'assets/Create account.png',
+                          fit: BoxFit.contain,
+                          alignment: Alignment.center,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: kBgBottom,
+                              child: const Center(
+                                child: Icon(Icons.image_not_supported, size: 50, color: kMutedText),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      Positioned(
+                        top: 12,
+                        left: 16,
+                        child: InkWell(
+                          onTap: () {
+                            if (Navigator.canPop(context)) {
+                              Navigator.pop(context);
+                            } else {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(16),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.9),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: kAccentPurple,
+                              size: 18,
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   // 2. Form Container
