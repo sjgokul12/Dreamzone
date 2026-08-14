@@ -407,7 +407,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         }
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final response = await request.send().timeout(const Duration(seconds: 60));
       final resBody = await response.stream.bytesToString();
       final data = jsonDecode(resBody);
 

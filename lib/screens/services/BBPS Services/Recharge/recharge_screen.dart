@@ -31,6 +31,7 @@ class _RechargeScreenState extends State<RechargeScreen> {
   String _selectedCircle = 'Select circle';
 
   bool _loadingData = true;
+  String? _loadError;
   List<Map<String, dynamic>> _prepaidOperators = [];
   List<Map<String, dynamic>> _postpaidOperators = [];
   List<String> _circles = ['Select circle'];
@@ -48,24 +49,22 @@ class _RechargeScreenState extends State<RechargeScreen> {
   }
 
   Future<void> _fetchData() async {
-    setState(() => _loadingData = true);
+    if (mounted) setState(() { _loadingData = true; _loadError = null; });
     final api = ApiService();
     try {
       final preRes = await api.getRechargeOperators('prepaid');
       final postRes = await api.getRechargeOperators('postpaid');
       final circleRes = await api.getRechargeCircles();
 
-      List<Map<String, dynamic>> preOps = [];
-      if (preRes['success'] == true && preRes['operators'] != null) {
-        preOps = List<Map<String, dynamic>>.from(preRes['operators']);
-      }
-      
-      List<Map<String, dynamic>> postOps = [];
-      if (postRes['success'] == true && postRes['operators'] != null) {
-        postOps = List<Map<String, dynamic>>.from(postRes['operators']);
-      }
-      
-      List<String> circs = ['Select circle'];
+      final preOps = (preRes['success'] == true && preRes['operators'] != null)
+          ? List<Map<String, dynamic>>.from(preRes['operators'])
+          : <Map<String, dynamic>>[];
+
+      final postOps = (postRes['success'] == true && postRes['operators'] != null)
+          ? List<Map<String, dynamic>>.from(postRes['operators'])
+          : <Map<String, dynamic>>[];
+
+      final circs = <String>['Select circle'];
       if (circleRes['success'] == true && circleRes['circles'] != null) {
         circs.addAll(List<String>.from(circleRes['circles']));
       }
@@ -78,11 +77,20 @@ class _RechargeScreenState extends State<RechargeScreen> {
           _selectedOperator = 'Select operator';
           _selectedCircle = 'Select circle';
           _loadingData = false;
+          _loadError = (preOps.isEmpty && postOps.isEmpty)
+              ? 'No operators available. Please retry.'
+              : null;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _loadingData = false);
+        setState(() {
+          _prepaidOperators = [];
+          _postpaidOperators = [];
+          _circles = ['Select circle'];
+          _loadingData = false;
+          _loadError = 'Failed to load operators. Check connection and retry.';
+        });
       }
     }
   }
@@ -396,6 +404,28 @@ class _RechargeScreenState extends State<RechargeScreen> {
                 child: Padding(
                   padding: EdgeInsets.all(20.0),
                   child: CircularProgressIndicator(color: primaryPurple),
+                ),
+              )
+            else if (_loadError != null)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFFCBD5E1)),
+                    const SizedBox(height: 12),
+                    Text(_loadError!, textAlign: TextAlign.center,
+                        style: const TextStyle(color: textSubdued, fontSize: 13, height: 1.4)),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _fetchData,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryPurple, foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    ),
+                  ],
                 ),
               )
             else ...[

@@ -790,24 +790,15 @@ class _GstServiceScreenState extends State<GstServiceScreen>
               ),
               const SizedBox(height: 10),
               const Text(
-                'GST',
+                'GST Registration',
                 style: TextStyle(
                   color: Color(0xFF0F172A),
-                  fontSize: 32,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 0.5,
                 ),
               ),
-              const Text(
-                'Registration',
-                style: TextStyle(
-                  color: Color(0xFF8B5CF6),
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               const Text(
                 'Register your business\nin just a few simple steps',
                 style: TextStyle(
@@ -816,23 +807,27 @@ class _GstServiceScreenState extends State<GstServiceScreen>
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 16),
-              _buildFeaturePill(Icons.verified_user_rounded, 'Secure & Trusted', '100% Safe & Secure'),
-              const SizedBox(height: 8),
-              _buildFeaturePill(Icons.bolt_rounded, 'Quick & Easy', 'Complete in Minutes'),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _buildFeaturePill(Icons.verified_user_rounded, 'Secure', '100% Safe'),
+                  const SizedBox(width: 10),
+                  _buildFeaturePill(Icons.bolt_rounded, 'Quick', 'Minutes'),
+                ],
+              ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 0),
         Expanded(
           flex: 2,
           child: Align(
             alignment: Alignment.centerRight,
             child: Image.asset(
               'assets/GST top.png',
-              height: 200,
+              height: 180,
               fit: BoxFit.contain,
-              errorBuilder: (ctx, error, stackTrace) => Image.asset('assets/GST image.png', height: 200, fit: BoxFit.contain, errorBuilder: (c,e,s) => const SizedBox(height: 200)),
+              errorBuilder: (ctx, error, stackTrace) => Image.asset('assets/GST image.png', height: 150, fit: BoxFit.contain, errorBuilder: (c,e,s) => const SizedBox(height: 150)),
             ),
           ),
         ),

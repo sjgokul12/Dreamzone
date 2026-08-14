@@ -80,7 +80,6 @@ class _LandlineScreenState extends State<LandlineScreen>
   @override
   void dispose() {
     _fadeController.dispose();
-    _fadeController.dispose();
     _landlineCtrl.dispose();
     _stdCodeCtrl.dispose();
     _amountCtrl.dispose();
@@ -88,6 +87,7 @@ class _LandlineScreenState extends State<LandlineScreen>
     super.dispose();
   }
 
+  
   Future<void> _fetchOperators() async {
     if (mounted) {
       setState(() {
@@ -98,7 +98,7 @@ class _LandlineScreenState extends State<LandlineScreen>
     try {
       final res = await ApiService.fetchApi('/landline/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['success'] == true && data['operators'] != null) {
+      if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final list = (data['operators'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -111,9 +111,7 @@ class _LandlineScreenState extends State<LandlineScreen>
       } else {
         if (mounted) {
           setState(() {
-            _opsError =
-                data['message']?.toString() ??
-                'Failed to load landline operators';
+            _opsError = data['message']?.toString() ?? 'Failed to load operators';
             _opsLoading = false;
           });
         }
@@ -121,7 +119,7 @@ class _LandlineScreenState extends State<LandlineScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _opsError = 'Failed to connect to server. Tap Retry.';
+          _opsError = 'Failed to load operators';
           _opsLoading = false;
         });
       }

@@ -1170,7 +1170,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final opts = [
         {
           'title': 'New PAN Card',
-          'subtitle': 'Apply for a new PAN card easily',
+          'subtitle': 'Apply for a brand new PAN card',
           'icon': Icons.add_card_rounded,
           'icon_bg': const Color(0xFFECFDF5),
           'icon_color': const Color(0xFF059669),
@@ -1196,8 +1196,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'title': 'Find PAN',
           'subtitle': 'Retrieve lost or forgotten PAN details',
           'icon': Icons.search_rounded,
-          'icon_bg': const Color(0xFFF0FDF4),
-          'icon_color': const Color(0xFF16A34A),
+          'icon_bg': const Color(0xFFF3E8FF),
+          'icon_color': const Color(0xFF9333EA),
           'section_data': {'id': 204, 'section_name': 'Find PAN'},
         },
       ];
@@ -2099,9 +2099,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     icon: Icons.logout_rounded,
                     title: 'Logout',
                     accentColor: const Color(0xFFEF4444), // Red for logout
-                    onTap: () {
+                    onTap: () async {
                       Navigator.pop(context);
-                      auth.logout();
+                      await auth.logout();
+                      if (context.mounted) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          (route) => false,
+                        );
+                      }
                     },
                   ),
               ],
@@ -2482,51 +2489,37 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ) {
     final lower = name.toLowerCase();
 
-    String assetPath = localAsset;
-    if (!lower.contains('landline') && assetPath.contains('Landline.png')) {
-      assetPath = '';
+    // Always do name-based asset lookup FIRST so known services never flash
+    String assetPath = '';
+    if (lower.contains('aadhaar')) assetPath = 'assets/Aadhaar.png';
+    if (lower.contains('pan')) assetPath = 'assets/PAN.png';
+    if (lower.contains('gst')) assetPath = 'assets/GST.png';
+    if (lower.contains('voter')) assetPath = 'assets/Voter.png';
+    if (lower.contains('fastag')) assetPath = 'assets/Fastag.png';
+    if (lower.contains('landline')) assetPath = 'assets/Landline.png';
+    if (lower.contains('dth')) assetPath = 'assets/DTH.png';
+    if (lower.contains('electricity')) assetPath = 'assets/Electricity.png';
+    if (lower.contains('piped gas')) {
+      assetPath = 'assets/Piped Gas Bill.png';
+    } else if (lower.contains('gas') || lower.contains('cylinder')) {
+      assetPath = 'assets/GAS.png';
+    }
+    if (lower.contains('dsc')) assetPath = 'assets/DSC.png';
+    if (lower.contains('msme') || lower.contains('udyam')) assetPath = 'assets/MSME.png';
+    if (lower.contains('fssai') || lower.contains('food')) assetPath = 'assets/FSSAI.png';
+    if (lower.contains('passport')) assetPath = 'assets/PassPort.png';
+    if (lower.contains('metro')) assetPath = 'assets/Metro card Recharge.png';
+    if (lower.contains('broadband') || lower.contains('fiber')) assetPath = 'assets/Broadband.png';
+    if (lower.contains('insurance') || lower.contains('premium')) assetPath = 'assets/Insurance premium.png';
+    if (lower.contains('money') || lower.contains('transfer')) assetPath = 'assets/Money Transfer.png';
+    if (lower.contains('municipal') || lower.contains('tax')) assetPath = 'assets/Muncipal Taxes.png';
+    if (lower.contains('recharge') || lower.contains('postpaid') || lower.contains('mobile')) {
+      assetPath = 'assets/Postpaid Mobile Recharges.png';
     }
 
-    if (assetPath.isEmpty) {
-      if (lower.contains('aadhaar')) assetPath = 'assets/Aadhaar.png';
-      if (lower.contains('pan')) assetPath = 'assets/PAN.png';
-      if (lower.contains('gst')) assetPath = 'assets/GST.png';
-      if (lower.contains('voter')) assetPath = 'assets/Voter.png';
-      if (lower.contains('fastag purchase') || lower.contains('fastag_purchase')) {
-        assetPath = 'assets/Fastag Purchase.png';
-      } else if (lower.contains('fastag') || lower.contains('toll')) {
-        assetPath = 'assets/Car.png';
-      }
-      if (lower.contains('landline')) {
-        assetPath = 'assets/Landline.png';
-      }
-      if (lower.contains('piped gas')) {
-        assetPath = 'assets/Piped Gas Bill.png';
-      } else if (lower.contains('gas') || lower.contains('cylinder')) assetPath = 'assets/GAS.png';
-      if (lower.contains('dsc')) assetPath = 'assets/DSC.png';
-      if (lower.contains('msme') || lower.contains('udyam')) assetPath = 'assets/MSME.png';
-      if (lower.contains('fssai') || lower.contains('food')) assetPath = 'assets/FSSAI.png';
-      if (lower.contains('passport')) assetPath = 'assets/PassPort.png';
-      if (lower.contains('metro')) {
-        assetPath = 'assets/Metro card Recharge.png';
-      }
-      if (lower.contains('broadband') || lower.contains('fiber')) {
-        assetPath = 'assets/Broadband.png';
-      }
-      if (lower.contains('insurance') || lower.contains('premium')) {
-        assetPath = 'assets/Insurance premium.png';
-      }
-      if (lower.contains('money') || lower.contains('transfer')) {
-        assetPath = 'assets/Money Transfer.png';
-      }
-      if (lower.contains('municipal') || lower.contains('tax')) {
-        assetPath = 'assets/Muncipal Taxes.png';
-      }
-      if (lower.contains('recharge') ||
-          lower.contains('postpaid') ||
-          lower.contains('mobile')) {
-        assetPath = 'assets/Postpaid Mobile Recharges.png';
-      }
+    // Fall back to the localAsset provided by the service data
+    if (assetPath.isEmpty && localAsset.isNotEmpty) {
+      assetPath = localAsset;
     }
 
     if (assetPath.isNotEmpty) {
@@ -2535,10 +2528,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.contain,
-        errorBuilder: (c, e, s) => _buildFallbackIconBadge(icon, color),
+        errorBuilder: (c, e, s) {
+          // If asset fails, try a network URL before showing icon
+          if (imageUrl.isNotEmpty) {
+            return Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.contain,
+              errorBuilder: (c2, e2, s2) => _buildFallbackIconBadge(icon, color),
+            );
+          }
+          return _buildFallbackIconBadge(icon, color);
+        },
       );
     }
 
+    // Only use network as last resort (no loadingBuilder flash)
     if (imageUrl.isNotEmpty) {
       return Image.network(
         imageUrl,
@@ -2546,8 +2552,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         height: double.infinity,
         fit: BoxFit.contain,
         errorBuilder: (c, e, s2) => _buildFallbackIconBadge(icon, color),
-        loadingBuilder: (c, child, progress) =>
-            progress == null ? child : _buildFallbackIconBadge(icon, color),
       );
     }
 
@@ -3295,30 +3299,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ==================== BOTTOM NAVIGATION BAR (SCREENSHOT-MATCHING STYLE) ====================
   Widget _buildBottomNav() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(24),
+        color: Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0x14161A3A)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x281E1B4B),
-            blurRadius: 30,
-            offset: Offset(0, 10),
+            color: Color(0x1F1E1B4B),
+            blurRadius: 20,
+            offset: Offset(0, 6),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Expanded(child: _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'Home')),
-              Expanded(child: _buildNavItem(1, Icons.grid_view_rounded, Icons.grid_view, 'Categories')),
-              Expanded(child: _buildNavItem(2, Icons.assignment_rounded, Icons.assignment_outlined, 'My Service')),
-              Expanded(child: _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'You')),
+              Expanded(child: _buildNavItem(1, Icons.grid_view_rounded, Icons.grid_view, 'Services')),
+              Expanded(child: _buildNavItem(2, Icons.assignment_rounded, Icons.assignment_outlined, 'Orders')),
+              Expanded(child: _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile')),
             ],
           ),
         ),
@@ -3339,14 +3343,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         decoration: BoxDecoration(
           gradient: isSelected
               ? const LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFFF4B91)]) // Purple to Pink
               : null,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: isSelected
-              ? [BoxShadow(color: const Color(0xFF8B3DFF).withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 8))]
+              ? [BoxShadow(color: const Color(0xFF8B3DFF).withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4))]
               : null,
         ),
         child: Column(
@@ -3355,14 +3359,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Icon(
               isSelected ? activeIcon : inactiveIcon,
               color: isSelected ? Colors.white : const Color(0xFF64748B),
-              size: 20,
+              size: 18,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
               style: TextStyle(
                 color: isSelected ? Colors.white : const Color(0xFF64748B),
-                fontSize: 10,
+                fontSize: 9.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
               ),
             ),

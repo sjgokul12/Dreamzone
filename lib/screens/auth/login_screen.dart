@@ -4,6 +4,7 @@ import '../home/home_screen.dart';
 import 'register_screen.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import 'otp_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -56,6 +57,22 @@ class _LoginScreenState extends State<LoginScreen> {
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen(isGuest: false)),
           (route) => false,
+        );
+      } else if (result['needs_verification'] == true) {
+        // Account exists but OTP was never verified — send them to the
+        // OTP screen instead of just showing an error.
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify the OTP sent to your email first.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        final email = result['email'] ?? loginId;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OtpScreen(email: email, isRegistration: true),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(

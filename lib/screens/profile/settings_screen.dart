@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../home/home_screen.dart';
+import '../auth/login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,14 +18,14 @@ class _SettingsScreenState extends State<SettingsScreen>
   late Animation<Offset> _slideAnimation;
 
   // Premium Project Purple Palette
-  static const Color primaryTeal = Color(0xFF8B5CF6);
-  static const Color secondaryTeal = Color(0xFF9333EA);
-  static const Color headerGradientStart = Color(0xFF8B5CF6);
-  static const Color headerGradientEnd = Color(0xFF9333EA);
-  Color get textDarkHeading => Provider.of<AuthProvider>(context).isDarkMode ? Colors.white : const Color(0xFF0F172A);
-  Color get textSubdued => Provider.of<AuthProvider>(context).isDarkMode ? Colors.grey[400]! : const Color(0xFF64748B);
-  Color get bgCanvas => Provider.of<AuthProvider>(context).isDarkMode ? const Color(0xFF0D0D0D) : const Color(0xFFF1F5F9);
-  Color get cardSurface => Provider.of<AuthProvider>(context).isDarkMode ? const Color(0xFF1A1A1A) : Colors.white;
+  static const Color primaryTeal = Color(0xFF7F00FF);
+  static const Color secondaryTeal = Color(0xFFE100FF);
+  static const Color headerGradientStart = Color(0xFF7F00FF);
+  static const Color headerGradientEnd = Color(0xFFE100FF);
+  Color get textDarkHeading => const Color(0xFF0F172A);
+  Color get textSubdued => const Color(0xFF64748B);
+  Color get bgCanvas => const Color(0xFFF1F5F9);
+  Color get cardSurface => Colors.white;
   static const Color dangerRed = Color(0xFFEF4444);
 
   @override
@@ -116,20 +117,17 @@ class _SettingsScreenState extends State<SettingsScreen>
                   SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        final auth = Provider.of<AuthProvider>(
-                          context,
-                          listen: false,
-                        );
-                        auth.logout();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const HomeScreen(isGuest: true),
-                          ),
-                          (route) => false,
-                        );
+                        final auth = Provider.of<AuthProvider>(context, listen: false);
+                        await auth.logout();
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: dangerRed,
@@ -394,43 +392,28 @@ class _SettingsScreenState extends State<SettingsScreen>
                       // Profile Card
                       _buildProfileCard(auth, isGuest),
 
-                      SizedBox(height: 24),
-
-                      // Appearance Section
-                      _buildSectionHeader('Appearance', Icons.palette_outlined),
-                      _buildTileGroup([
-                        _buildSwitchTile(
-                          title: 'Dark Mode',
-                          subtitle: 'Switch between light and dark theme',
-                          value: auth.isDarkMode,
-                          onChanged: (v) => auth.setDarkMode(v),
-                          icon: Icons.dark_mode_outlined,
-                        ),
-                      ]),
-
-                      SizedBox(height: 22),
-
-                      // Notifications Section
-                      _buildSectionHeader('Notifications', Icons.notifications_outlined),
-                      _buildTileGroup([
-                        _buildSwitchTile(
-                          title: 'Push Notifications',
-                          subtitle: 'Receive instant status updates & alerts',
-                          value: auth.notificationsEnabled,
-                          onChanged: (v) => auth.setNotifications(v),
-                          icon: Icons.notifications_active_outlined,
-                        ),
-                        _buildDivider(),
-                        _buildSwitchTile(
-                          title: 'Email Alerts',
-                          subtitle: 'Get official application receipts via email',
-                          value: auth.emailAlertsEnabled,
-                          onChanged: (v) => auth.setEmailAlerts(v),
-                          icon: Icons.email_outlined,
-                        ),
-                      ]),
-
                       if (!isGuest) ...[
+                        SizedBox(height: 22),
+
+                        // Notifications Section
+                        _buildSectionHeader('Notifications', Icons.notifications_outlined),
+                        _buildTileGroup([
+                          _buildSwitchTile(
+                            title: 'Push Notifications',
+                            subtitle: 'Receive instant status updates & alerts',
+                            value: auth.notificationsEnabled,
+                            onChanged: (v) => auth.setNotifications(v),
+                            icon: Icons.notifications_active_outlined,
+                          ),
+                          _buildDivider(),
+                          _buildSwitchTile(
+                            title: 'Email Alerts',
+                            subtitle: 'Get official application receipts via email',
+                            value: auth.emailAlertsEnabled,
+                            onChanged: (v) => auth.setEmailAlerts(v),
+                            icon: Icons.email_outlined,
+                          ),
+                        ]),
                         SizedBox(height: 22),
 
                         // Account Section
@@ -440,7 +423,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                             title: 'Logout',
                             subtitle: 'Sign out from your DZI Infinity account',
                             icon: Icons.logout_rounded,
-                            color: secondaryTeal,
+                            color: primaryTeal,
                             onTap: _showLogoutDialog,
                           ),
                           _buildDivider(),

@@ -107,7 +107,7 @@ class BusApiService {
     try {
       final res = await http
           .get(Uri.parse('$_productionBaseUrl/cancelledBusesInfo?fromDate=$fromDate&toDate=$toDate'))
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
       return json.decode(res.body) as List<dynamic>;
     } catch (e) {
       throw Exception('Server unreachable: $e');

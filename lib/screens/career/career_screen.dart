@@ -19,11 +19,11 @@ class CareerScreen extends StatefulWidget {
 class _CareerScreenState extends State<CareerScreen>
     with SingleTickerProviderStateMixin {
   // Money Transfer Reference Teal & Orange Theme Palette
-  static const Color primaryPurple = Color(0xFF00A896);
-  static const Color primaryDark = Color(0xFF028090);
-  static const Color accentIndigo = Color(0xFFFF6B00);
-  static const Color bgGradientStart = Color(0xFFE0F2F1);
-  static const Color bgGradientEnd = Color(0xFFF4FBF7);
+  static const Color primaryPurple = Color(0xFF7C6CF0); // Premium Purple
+  static const Color primaryDark = Color(0xFF5E4EE0);
+  static const Color accentIndigo = Color(0xFFA18BFF);
+  static const Color bgGradientStart = Color(0xFFF6F4FF);
+  static const Color bgGradientEnd = Color(0xFFFFFFFF);
   static const Color cardWhite = Colors.white;
   static const Color textDark = Color(0xFF1E1B4B);
   static const Color textMuted = Color(0xFF64748B);

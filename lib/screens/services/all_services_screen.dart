@@ -1204,11 +1204,11 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
       final opts = [
         {
           'title': 'New PAN Card',
-          'subtitle': 'Apply for a new PAN card easily',
+          'subtitle': 'Apply for a brand new PAN card',
           'icon': Icons.add_card_rounded,
           'icon_bg': const Color(0xFFECFDF5),
           'icon_color': const Color(0xFF059669),
-          'section_data': {'id': 202, 'section_name': 'New PAN Card'},
+          'section_data': {'id': 201, 'section_name': 'New PAN'},
         },
         {
           'title': 'Correction PAN',
@@ -1216,7 +1216,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
           'icon': Icons.edit_document,
           'icon_bg': const Color(0xFFFFF7ED),
           'icon_color': const Color(0xFFEA580C),
-          'section_data': {'id': 201, 'section_name': 'Correction PAN'},
+          'section_data': {'id': 202, 'section_name': 'Correction PAN'},
         },
         {
           'title': 'Foreign PAN',
@@ -1224,15 +1224,15 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
           'icon': Icons.public_rounded,
           'icon_bg': const Color(0xFFEFF6FF),
           'icon_color': const Color(0xFF2563EB),
-          'section_data': {'id': 203, 'section_name': 'Foreign PAN Card'},
+          'section_data': {'id': 203, 'section_name': 'Foreign PAN'},
         },
         {
           'title': 'Find PAN',
           'subtitle': 'Retrieve lost or forgotten PAN details',
           'icon': Icons.search_rounded,
-          'icon_bg': const Color(0xFFF0FDF4),
-          'icon_color': const Color(0xFF16A34A),
-          'section_data': {'id': 204, 'section_name': 'Find PAN Card'},
+          'icon_bg': const Color(0xFFF3E8FF),
+          'icon_color': const Color(0xFF9333EA),
+          'section_data': {'id': 204, 'section_name': 'Find PAN'},
         },
       ];
       _showModernServicePopup(service, opts);

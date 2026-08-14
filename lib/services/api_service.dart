@@ -8,7 +8,7 @@ class ApiService {
   static const String adminBaseUrl = 'https://dzi-backend.onrender.com/api/admin';
 
   /// Centralized GET request that scans local IPs (192.168.1.6, 127.0.0.1, 10.0.2.2), localhost, and production Render URL.
-  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 30}) async {
+  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 60}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = <String, String>{};
@@ -25,7 +25,7 @@ class ApiService {
   }
 
   /// Centralized POST request that scans local IPs and production Render URL.
-  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 30}) async {
+  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 60}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = {'Content-Type': 'application/json'};
@@ -52,15 +52,20 @@ class ApiService {
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       
-      if (response.statusCode >= 200) {
-        return jsonDecode(response.body);
+      if (response.body.trim().isEmpty) {
+        return {'success': false, 'message': 'Empty response from server (HTTP ${response.statusCode})'};
       }
-      return {'success': false, 'message': 'HTTP ${response.statusCode}'};
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return decoded;
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid response from server (HTTP ${response.statusCode})'};
+      }
     } catch (e) {
       print('GET ERROR on $endpoint: $e');
-      return {'success': false, 'message': 'Server not reachable: $e'};
+      return {'success': false, 'message': 'Server not reachable: ${e.toString().replaceAll("FormatException: ", "")}'};
     }
   }
 
@@ -75,15 +80,20 @@ class ApiService {
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
         body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       
-      if (response.statusCode >= 200) {
-        return jsonDecode(response.body);
+      if (response.body.trim().isEmpty) {
+        return {'success': false, 'message': 'Empty response from server (HTTP ${response.statusCode})'};
       }
-      return {'success': false, 'message': 'HTTP ${response.statusCode}'};
+      try {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        return decoded;
+      } catch (e) {
+        return {'success': false, 'message': 'Invalid response from server (HTTP ${response.statusCode})'};
+      }
     } catch (e) {
       print('POST ERROR on $endpoint: $e');
-      return {'success': false, 'message': 'Server not reachable: $e'};
+      return {'success': false, 'message': 'Server not reachable: ${e.toString().replaceAll("FormatException: ", "")}'};
     }
   }
 
@@ -115,7 +125,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/services'),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'services': []};
@@ -132,7 +142,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/recharge/operators?type=$type'),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'operators': []};
@@ -143,7 +153,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/recharge/circles'),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'circles': []};
@@ -155,7 +165,7 @@ class ApiService {
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/services/$serviceId/sections'),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'sections': []};
@@ -192,7 +202,7 @@ class ApiService {
         Uri.parse('$baseUrl/user/$userId'),
         headers: headers,
         body: jsonEncode({'name': name, 'mobile': mobile, 'email': email}),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection failed'};
@@ -228,7 +238,7 @@ class ApiService {
         Uri.parse('$baseUrl/user/$userId/settings'),
         headers: headers,
         body: jsonEncode(settings),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection failed'};
@@ -246,7 +256,7 @@ class ApiService {
         Uri.parse('$baseUrl/user/$userId/delete'),
         headers: headers,
         body: jsonEncode({'password': password}),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection failed'};
@@ -327,7 +337,7 @@ class ApiService {
         Uri.parse('$baseUrl/user/$userId/saved-details'),
         headers: headers,
         body: jsonEncode(details),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection failed'};
@@ -345,7 +355,7 @@ class ApiService {
       var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/user/$userId/documents'));
       request.fields['doc_type'] = docType;
       request.files.add(http.MultipartFile.fromBytes('file', fileBytes, filename: fileName));
-      final response = await request.send().timeout(const Duration(seconds: 30));
+      final response = await request.send().timeout(const Duration(seconds: 60));
       final result = await http.Response.fromStream(response);
       return jsonDecode(result.body);
     } catch (e) {
@@ -363,7 +373,7 @@ class ApiService {
       final response = await http.delete(
         Uri.parse('$baseUrl/user/$userId/documents/$docId'),
         headers: headers,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection failed'};

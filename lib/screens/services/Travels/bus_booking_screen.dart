@@ -160,7 +160,7 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
   Future<void> _fetchStations() async {
     try {
       final data = await BusApiService.getStations();
-      if (data['stationList'] != null) {
+      if (data['stationList'] != null && (data['stationList'] as List).isNotEmpty) {
         if (mounted) {
           setState(() {
             _stationList = (data['stationList'] as List)
@@ -169,11 +169,18 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
             _isLoadingStations = false;
           });
         }
+      } else {
+        if (mounted) {
+          setState(() {
+            _stationError = data['apiStatus']?['message']?.toString() ?? 'Failed to load stations from server';
+            _isLoadingStations = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _stationError = 'Failed to load stations';
+          _stationError = 'Failed to load stations: $e';
           _isLoadingStations = false;
         });
       }

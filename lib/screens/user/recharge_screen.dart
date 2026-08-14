@@ -1,9 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/api_service.dart';
 import '../../services/recharge_service.dart';
 
 // Live mobile recharge screen with Prepaid + Postpaid tabs, matching
@@ -90,15 +87,19 @@ class _RechargeScreenState extends State<RechargeScreen>
     try {
       final data = await RechargeService.getOperators('prepaid');
       if (data['success'] == true && mounted) {
+        final list = (data['operators'] as List<dynamic>?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
         setState(() {
-          _prepaidOperators = data['operators'] ?? [];
-          if (_prepaidOperators.isNotEmpty) {
-            _selectedPrepaidOperator = _prepaidOperators.first;
-          }
+          _prepaidOperators = list;
+          _selectedPrepaidOperator = _prepaidOperators.isNotEmpty ? _prepaidOperators.first : null;
         });
       }
     } catch (e) {
-      debugPrint('Error loading prepaid operators: $e');
+      if (mounted) {
+        setState(() {
+          _prepaidOperators = [];
+          _selectedPrepaidOperator = null;
+        });
+      }
     }
     if (mounted) setState(() => _loadingPrepaidOperators = false);
   }
@@ -108,15 +109,19 @@ class _RechargeScreenState extends State<RechargeScreen>
     try {
       final data = await RechargeService.getOperators('postpaid');
       if (data['success'] == true && mounted) {
+        final list = (data['operators'] as List<dynamic>?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
         setState(() {
-          _postpaidOperators = data['operators'] ?? [];
-          if (_postpaidOperators.isNotEmpty) {
-            _selectedPostpaidOperator = _postpaidOperators.first;
-          }
+          _postpaidOperators = list;
+          _selectedPostpaidOperator = _postpaidOperators.isNotEmpty ? _postpaidOperators.first : null;
         });
       }
     } catch (e) {
-      debugPrint('Error loading postpaid operators: $e');
+      if (mounted) {
+        setState(() {
+          _postpaidOperators = [];
+          _selectedPostpaidOperator = null;
+        });
+      }
     }
     if (mounted) setState(() => _loadingPostpaidOperators = false);
   }
@@ -125,13 +130,19 @@ class _RechargeScreenState extends State<RechargeScreen>
     try {
       final data = await RechargeService.getCircles();
       if (data['success'] == true && mounted) {
+        final list = List<String>.from(data['circles'] ?? []);
         setState(() {
-          _circles = List<String>.from(data['circles'] ?? []);
-          if (_circles.isNotEmpty) _selectedCircle = _circles.first;
+          _circles = list;
+          _selectedCircle = _circles.isNotEmpty ? _circles.first : null;
         });
       }
     } catch (e) {
-      debugPrint('Error loading circles: $e');
+      if (mounted) {
+        setState(() {
+          _circles = [];
+          _selectedCircle = null;
+        });
+      }
     }
   }
 

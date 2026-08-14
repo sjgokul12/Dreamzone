@@ -18,17 +18,17 @@ class DTHScreen extends StatefulWidget {
 }
 
 class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
-  // Money Transfer Reference Teal & Orange Theme Palette
-  static const Color primaryPurple = Color(0xFF00A896);
-  static const Color primaryDark = Color(0xFF028090);
-  static const Color accentViolet = Color(0xFF028090);
+  // Premium Purple Theme Palette matching screenshot
+  static const Color primaryPurple = Color(0xFF7F00FF);
+  static const Color primaryDark = Color(0xFF5E00C9);
+  static const Color accentViolet = Color(0xFFE100FF);
   static const Color accentRed = Color(0xFFFF6B00);
-  static const Color bgGradientEnd = Color(0xFFF4FBF7);
+  static const Color bgGradientEnd = Color(0xFFF9FAFB); // Very light grey background
   static const Color cardWhite = Colors.white;
   static const Color textDark = Color(0xFF1E1B4B);
   static const Color textMuted = Color(0xFF64748B);
-  static const Color borderColor = Color(0xFFE9D5FF);
-  static const Color inputFill = Color(0xFFFAF5FF);
+  static const Color borderColor = Color(0xFFE2E8F0);
+  static const Color inputFill = Color(0xFFF8FAFC);
 
   // Form Keys & Controllers
   final _formKey = GlobalKey<FormState>();
@@ -95,6 +95,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  
   Future<void> _fetchOperators() async {
     setState(() {
       _operatorsLoading = true;
@@ -103,7 +104,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
     try {
       final res = await ApiService.fetchApi('/dth/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['success'] == true && data['operators'] != null) {
+      if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final rawList = (data['operators'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -116,8 +117,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
       } else {
         if (mounted) {
           setState(() {
-            _operatorsError =
-                data['message']?.toString() ?? 'Failed to load DTH operators';
+            _operatorsError = data['message']?.toString() ?? 'Failed to load operators';
             _operatorsLoading = false;
           });
         }
@@ -125,7 +125,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _operatorsError = 'Failed to connect to server. Tap Retry.';
+          _operatorsError = 'Failed to load operators';
           _operatorsLoading = false;
         });
       }

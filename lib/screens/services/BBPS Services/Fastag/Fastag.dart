@@ -91,40 +91,32 @@ class _FastagScreenState extends State<FastagScreen>
     super.dispose();
   }
 
+
   Future<void> _fetchOperators() async {
-    if (mounted) {
-      setState(() {
-        _opsLoading = true;
-        _opsError = null;
-      });
-    }
+    if (mounted) setState(() { _opsLoading = true; _opsError = null; });
     try {
       final res = await ApiService.fetchApi('/fastag/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['success'] == true) {
+      if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final list = (data['operators'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
-        if (mounted) {
-          setState(() {
-            _operators = list;
-            _opsLoading = false;
-          });
-        }
+        if (mounted) setState(() { _operators = list; _opsLoading = false; });
       } else {
         if (mounted) {
           setState(() {
-            _opsError =
-                data['message']?.toString() ?? 'Failed to load FASTag issuers';
+            _operators = [];
             _opsLoading = false;
+            _opsError = data['message']?.toString() ?? 'No operators available. Please try again.';
           });
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _opsError = 'Failed to connect. Ensure python run.py is running.';
+          _operators = [];
           _opsLoading = false;
+          _opsError = 'Failed to load operators. Please check your connection and retry.';
         });
       }
     }
@@ -159,7 +151,7 @@ class _FastagScreenState extends State<FastagScreen>
               'amount': _amountCtrl.text.trim(),
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 60));
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {

@@ -5,12 +5,6 @@ import 'package:provider/provider.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
 
-// ─── DEV / PROD URL toggle ───────────────────────────────────────────────────
-// true  → connects to local Python server (same WiFi, run: python run.py)
-// false → connects to Render.com deployed server
- // ← your PC IP
-// ─────────────────────────────────────────────────────────────────────────────
-
 /// Convenient alias so both `Electricity` and `ElectricityScreen` can be used.
 typedef Electricity = ElectricityScreen;
 
@@ -23,24 +17,27 @@ class ElectricityScreen extends StatefulWidget {
 
 class _ElectricityScreenState extends State<ElectricityScreen>
     with TickerProviderStateMixin {
-  // Teal & Orange Theme Palette
-  static const Color primaryCyan   = Color(0xFF00A896);
-  static const Color primaryDark   = Color(0xFF028090);
-  static const Color accentNavy    = Color(0xFF0F172A);
-  static const Color accentRed     = Color(0xFFFF6B00);
-  static const Color bgGradientStart = Color(0xFFE0F2F1);
-  static const Color bgGradientEnd   = Color(0xFFF4FBF7);
-  static const Color cardWhite     = Colors.white;
-  static const Color textDark      = Color(0xFF0F172A);
-  static const Color textMuted     = Color(0xFF64748B);
-  static const Color borderColor   = Color(0xFFBAE6FD);
-  static const Color inputFill     = Color(0xFFF0F9FF);
+  // ─── Purple / Violet Theme Palette (matches reference design) ─────────────
+  static const Color primaryPurple      = Color(0xFF6C5CE7);
+  static const Color primaryPurpleDark  = Color(0xFF5B4BD6);
+  static const Color primaryPurpleDeep  = Color(0xFF4B3FC2);
+  static const Color accentNavy         = Color(0xFF1E1B3A);
+  static const Color accentRed          = Color(0xFFFF6B6B);
+  static const Color bgGradientStart    = Color(0xFFF3F1FF);
+  static const Color bgGradientEnd      = Color(0xFFFAFAFF);
+  static const Color cardWhite          = Colors.white;
+  static const Color textDark           = Color(0xFF1E1B3A);
+  static const Color textMuted          = Color(0xFF6B7280);
+  static const Color borderColor        = Color(0xFFE4DFFB);
+  static const Color inputFill          = Color(0xFFF6F4FF);
+  static const Color chipLavender       = Color(0xFFEDE9FE);
 
   // Form
   final _formKey            = GlobalKey<FormState>();
   final _subscriptionIdCtrl = TextEditingController();
   final _amountCtrl         = TextEditingController();
   int? _expandedAssuranceIndex;
+  bool _instantProcessing   = true;
 
   // ─── API-driven Operators ─────────────────────────────────────────────────
   List<Map<String, dynamic>> _operators     = [];
@@ -65,63 +62,35 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       _subscriptionIdCtrl.text.trim().isNotEmpty && _selectedOp != null;
 
   static Color _colorFor(String code, String label) {
+    // Keep every board icon inside the purple family so the palette stays
+    // consistent with the new theme, while still giving a touch of
+    // variety between different boards.
     final k = '${code}_$label'.toLowerCase();
     if (k.contains('adani') || k.contains('mumbai') || k.contains('best')) {
-      return const Color(0xFF0284C7);
+      return const Color(0xFF6C5CE7);
     }
-    if (k.contains('airtel') || k.contains('tata')) return const Color(0xFFE11D48);
+    if (k.contains('airtel') || k.contains('tata')) return const Color(0xFF8B7CF6);
     if (k.contains('bses') || k.contains('delhi') || k.contains('ndmc') ||
         k.contains('sndl')) {
-      return const Color(0xFF7C3AED);
+      return const Color(0xFF7C6FF0);
     }
     if (k.contains('tneb') || k.contains('kerala') || k.contains('kseb')) {
-      return const Color(0xFF10B981);
+      return const Color(0xFF5B4BD6);
     }
     if (k.contains('gujarat') || k.contains('torrent') || k.contains('dgvcl') ||
         k.contains('mgvcl') || k.contains('ugvcl') || k.contains('pgvcl')) {
-      return const Color(0xFFF59E0B);
+      return const Color(0xFF9C8CFB);
     }
     if (k.contains('karnataka') || k.contains('bescom') || k.contains('gescom') ||
         k.contains('hescom') || k.contains('mescom') || k.contains('chamundeshwari')) {
-      return const Color(0xFFE11D48);
+      return const Color(0xFF7C6FF0);
     }
     if (k.contains('rajasthan') || k.contains('jvvnl') || k.contains('avvnl') ||
         k.contains('jdvvnl') || k.contains('kota') || k.contains('bikaner') ||
         k.contains('bharatpur') || k.contains('ajmer')) {
-      return const Color(0xFFEC4899);
+      return const Color(0xFFA78BFA);
     }
-    if (k.contains('bihar') || k.contains('jharkhand') || k.contains('jbvnl')) {
-      return const Color(0xFF6366F1);
-    }
-    if (k.contains('odisha') || k.contains('wesco') || k.contains('nesco') ||
-        k.contains('sesco') || k.contains('cesco')) {
-      return const Color(0xFF0EA5E9);
-    }
-    if (k.contains('assam') || k.contains('northeast') || k.contains('meghalaya') ||
-        k.contains('mizoram') || k.contains('nagaland') || k.contains('tripura') ||
-        k.contains('sikkim')) {
-      return const Color(0xFF14B8A6);
-    }
-    if (k.contains('haryana') || k.contains('dhbvn') || k.contains('uhbvn')) {
-      return const Color(0xFFF97316);
-    }
-    if (k.contains('punjab') || k.contains('pspcl')) return const Color(0xFFEF4444);
-    if (k.contains('madhya') || k.contains('chhattisgarh')) {
-      return const Color(0xFF8B5CF6);
-    }
-    if (k.contains('uttar') || k.contains('uppcl') || k.contains('noida') ||
-        k.contains('kanpur') || k.contains('muzaffarpur')) {
-      return const Color(0xFF22C55E);
-    }
-    if (k.contains('west bengal') || k.contains('wbsedcl') || k.contains('cesc') ||
-        k.contains('india power')) {
-      return const Color(0xFF06B6D4);
-    }
-    if (k.contains('himachal') || k.contains('hpseb')) return const Color(0xFF6366F1);
-    if (k.contains('uttarakhand') || k.contains('upcl')) {
-      return const Color(0xFF0891B2);
-    }
-    return primaryCyan;
+    return primaryPurple;
   }
 
   static IconData _iconFor(String code, String label) {
@@ -159,11 +128,11 @@ class _ElectricityScreenState extends State<ElectricityScreen>
 
   // ─── API: Fetch Operators ─────────────────────────────────────────────────
   Future<void> _fetchOperators() async {
-    setState(() { _opsLoading = true; _opsError = null; });
+    if (mounted) setState(() { _opsLoading = true; _opsError = null; });
     try {
       final res = await ApiService.fetchApi('/electricity/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['success'] == true && data['operators'] != null) {
+      if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final list = (data['operators'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map))
             .toList();
@@ -171,16 +140,18 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       } else {
         if (mounted) {
           setState(() {
-            _opsError = data['message']?.toString() ?? 'Failed to load electricity operators';
+            _operators = [];
             _opsLoading = false;
+            _opsError = data['message']?.toString() ?? 'No operators available. Please try again.';
           });
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _opsError = 'Failed to connect to server. Tap Retry.';
+          _operators = [];
           _opsLoading = false;
+          _opsError = 'Failed to load operators. Please check your connection and retry.';
         });
       }
     }
@@ -280,7 +251,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Handle ──────────────────────────────────────────────────
                 const SizedBox(height: 12),
                 Container(
                   width: 44, height: 5,
@@ -289,7 +259,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                // ── Header ──────────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                   child: Row(children: [
@@ -307,15 +276,14 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: primaryCyan.withValues(alpha: 0.1),
+                        color: primaryPurple.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.electric_bolt_rounded,
-                          color: primaryCyan, size: 20),
+                          color: primaryPurple, size: 20),
                     ),
                   ]),
                 ),
-                // ── Search Box ───────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   child: TextField(
@@ -325,7 +293,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                       hintText: 'Search by board name or state…',
                       hintStyle: const TextStyle(color: textMuted, fontSize: 13),
                       prefixIcon: const Icon(Icons.search_rounded,
-                          color: primaryCyan, size: 20),
+                          color: primaryPurple, size: 20),
                       suffixIcon: _searchCtrl.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close_rounded,
@@ -347,13 +315,12 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                 ),
                 const SizedBox(height: 6),
                 const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                // ── Content: loading / error / list ──────────────────────────
                 Flexible(
                   child: _opsLoading
                       ? const Padding(
                           padding: EdgeInsets.all(40),
                           child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            CircularProgressIndicator(color: primaryCyan, strokeWidth: 2.5),
+                            CircularProgressIndicator(color: primaryPurple, strokeWidth: 2.5),
                             SizedBox(height: 14),
                             Text('Loading electricity boards…',
                                 style: TextStyle(color: textMuted, fontSize: 13)),
@@ -381,7 +348,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                                   icon: const Icon(Icons.refresh_rounded, size: 16),
                                   label: const Text('Retry'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryCyan,
+                                    backgroundColor: primaryPurple,
                                     foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12)),
@@ -443,7 +410,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                                           : null,
                                       trailing: isSel
                                           ? const Icon(Icons.check_circle_rounded,
-                                              color: primaryCyan, size: 22)
+                                              color: primaryPurple, size: 22)
                                           : const Icon(Icons.chevron_right_rounded,
                                               color: Color(0xFF94A3B8)),
                                       onTap: () {
@@ -473,7 +440,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             colors: [bgGradientStart, bgGradientEnd],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: [0.0, 0.45],
+            stops: [0.0, 0.5],
           ),
         ),
         child: SafeArea(
@@ -490,13 +457,15 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                           child: SingleChildScrollView(
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 20, vertical: 8),
+                                horizontal: 20, vertical: 4),
                             child: Form(
                               key: _formKey,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildHeroCard(),
+                                  _buildHeroHeadline(),
+                                  const SizedBox(height: 20),
+                                  _buildInstantPayCard(),
                                   const SizedBox(height: 18),
                                   _buildQuickPillsRow(),
                                   const SizedBox(height: 20),
@@ -505,8 +474,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                                     const SizedBox(height: 24),
                                     _buildSubmitButton(),
                                   ],
-                                  const SizedBox(height: 24),
-                                  _buildAssuranceListCard(),
                                   const SizedBox(height: 24),
                                 ],
                               ),
@@ -525,7 +492,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
   // ─── App Bar ──────────────────────────────────────────────────────────────
   Widget _buildCustomAppBar(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -541,23 +508,20 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                     blurRadius: 12, offset: const Offset(0, 4))],
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: textDark, size: 18),
+                  color: primaryPurple, size: 18),
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: cardWhite,
+              color: chipLavender,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: primaryCyan.withValues(alpha: 0.2)),
-              boxShadow: [BoxShadow(color: primaryCyan.withValues(alpha: 0.08),
-                  blurRadius: 10, offset: const Offset(0, 2))],
             ),
             child: const Row(children: [
-              Icon(Icons.verified_rounded, color: primaryCyan, size: 18),
+              Icon(Icons.shield_rounded, color: primaryPurple, size: 18),
               SizedBox(width: 6),
               Text('BBPS Assured',
-                  style: TextStyle(color: primaryCyan, fontSize: 13,
+                  style: TextStyle(color: primaryPurple, fontSize: 13,
                       fontWeight: FontWeight.w700)),
             ]),
           ),
@@ -566,102 +530,168 @@ class _ElectricityScreenState extends State<ElectricityScreen>
     );
   }
 
-  // ─── Hero Card ────────────────────────────────────────────────────────────
-  Widget _buildHeroCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [primaryCyan, primaryDark, accentNavy],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [BoxShadow(color: primaryCyan.withValues(alpha: 0.3),
-            blurRadius: 20, offset: const Offset(0, 10))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ─── Hero Headline + Bulb Illustration ────────────────────────────────────
+  Widget _buildHeroHeadline() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          // Soft decorative glow circle behind the bulb illustration
+          Positioned(
+            right: -10,
+            top: -10,
+            child: Container(
+              width: 170,
+              height: 170,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Row(children: [
-                Icon(Icons.bolt_rounded, color: Colors.amberAccent, size: 16),
-                SizedBox(width: 4),
-                Text('INSTANT PAY', style: TextStyle(color: Colors.white,
-                    fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-              ]),
-            ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
+                color: primaryPurple.withValues(alpha: 0.07),
               ),
-              child: const Icon(Icons.electric_meter_rounded,
-                  color: Colors.white, size: 22),
-            ),
-          ]),
-          const SizedBox(height: 18),
-          RichText(
-            text: const TextSpan(
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900,
-                  letterSpacing: 0.2, fontFamily: 'Roboto'),
-              children: [
-                TextSpan(text: 'RECHARGE YOUR ',
-                    style: TextStyle(color: Colors.white)),
-                TextSpan(text: '(Electricity Bill)',
-                    style: TextStyle(color: Color(0xFFFFD1D1),
-                        fontWeight: FontWeight.w900)),
-              ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text('Tell us your number and we will figure out the rest !',
-              style: TextStyle(fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.88), height: 1.4)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    RichText(
+                      text: const TextSpan(
+                        style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900,
+                            height: 1.15, fontFamily: 'Roboto'),
+                        children: [
+                          TextSpan(text: 'Recharge Your\n',
+                              style: TextStyle(color: textDark)),
+                          TextSpan(text: 'Electricity Bill',
+                              style: TextStyle(color: primaryPurple,
+                                  fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Tell us your number and\nwe will figure out the rest!',
+                        style: TextStyle(fontSize: 13.5,
+                            color: textMuted, height: 1.4)),
+                  ],
+                ),
+              ),
+              // ── Bulb + Meter illustration (assets/bulp.png) ──────────────
+              SizedBox(
+                width: 150,
+                height: 150,
+                child: Image.asset(
+                  'assets/bulp.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: primaryPurple.withValues(alpha: 0.08),
+                      ),
+                      child: const Icon(Icons.lightbulb_rounded,
+                          color: primaryPurple, size: 56),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  // ─── "Pay Smart. Live Easy." Instant Pay Card ─────────────────────────────
+  Widget _buildInstantPayCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      decoration: BoxDecoration(
+        color: chipLavender.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(children: [
+        Container(
+          width: 46, height: 46,
+          decoration: const BoxDecoration(
+            color: Colors.white, shape: BoxShape.circle),
+          child: const Icon(Icons.bolt_rounded, color: primaryPurple, size: 22),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [primaryPurple, primaryPurpleDark]),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text('INSTANT PAY',
+                    style: TextStyle(color: Colors.white, fontSize: 9.5,
+                        fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+              ),
+              const SizedBox(height: 6),
+              const Text('Pay Smart. Live Easy.',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                      color: textDark)),
+              const SizedBox(height: 2),
+              Text('Quick, secure and hassle-free\nelectricity bill payments.',
+                  style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3)),
+            ],
+          ),
+        ),
+        Container(
+          width: 40, height: 40,
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+          child: const Icon(Icons.arrow_forward_rounded, color: primaryPurple, size: 18),
+        ),
+      ]),
     );
   }
 
   // ─── Quick Pills ──────────────────────────────────────────────────────────
   Widget _buildQuickPillsRow() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 16),
       decoration: BoxDecoration(
         color: cardWhite,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+        boxShadow: [BoxShadow(color: const Color(0xFF1E1B3A).withValues(alpha: 0.03),
             blurRadius: 16, offset: const Offset(0, 6))],
       ),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        _buildPillItem(Icons.electric_meter_rounded, 'CA Number'),
-        _buildPillItem(Icons.grid_view_rounded, 'Operators'),
-        _buildPillItem(Icons.flash_on_rounded, 'Instant'),
-        _buildPillItem(Icons.security_rounded, 'Secured'),
+      child: Row(children: [
+        Expanded(child: _buildPillItem(Icons.credit_card_rounded, 'CA Number')),
+        _pillDivider(),
+        Expanded(child: _buildPillItem(Icons.grid_view_rounded, 'Operators')),
+        _pillDivider(),
+        Expanded(child: _buildPillItem(Icons.bolt_rounded, 'Instant')),
+        _pillDivider(),
+        Expanded(child: _buildPillItem(Icons.shield_rounded, 'Secured')),
       ]),
     );
   }
 
+  Widget _pillDivider() => Container(width: 1, height: 34, color: const Color(0xFFEEF0F5));
+
   Widget _buildPillItem(IconData icon, String label) {
-    return Column(children: [
+    return Column(mainAxisSize: MainAxisSize.min, children: [
       Container(
         width: 44, height: 44,
         decoration: BoxDecoration(
-          color: primaryCyan.withValues(alpha: 0.08), shape: BoxShape.circle),
-        child: Icon(icon, color: primaryCyan, size: 20),
+          color: chipLavender, shape: BoxShape.circle),
+        child: Icon(icon, color: primaryPurple, size: 20),
       ),
       const SizedBox(height: 6),
       Text(label, style: const TextStyle(fontSize: 11,
-          fontWeight: FontWeight.w600, color: textMuted)),
+          fontWeight: FontWeight.w700, color: textDark)),
     ]);
   }
 
@@ -681,16 +711,20 @@ class _ElectricityScreenState extends State<ElectricityScreen>
         color: cardWhite,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.05),
+        boxShadow: [BoxShadow(color: const Color(0xFF1E1B3A).withValues(alpha: 0.04),
             blurRadius: 24, offset: const Offset(0, 8))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
         // ── 1. CA / Consumer Number ──────────────────────────────────────────
-        const Row(children: [
-          Icon(Icons.electric_meter_outlined, size: 18, color: primaryCyan),
-          SizedBox(width: 8),
-          Text('Consumer / CA Number',
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: chipLavender, borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.credit_card_rounded, size: 16, color: primaryPurple),
+          ),
+          const SizedBox(width: 10),
+          const Text('Consumer / CA Number',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
         ]),
         const SizedBox(height: 10),
@@ -704,10 +738,10 @@ class _ElectricityScreenState extends State<ElectricityScreen>
           ],
           decoration: InputDecoration(
             hintText: 'Enter your CA / Consumer Number',
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+            hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
             filled: true, fillColor: inputFill,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            prefixIcon: const Icon(Icons.tag_rounded, color: primaryCyan, size: 20),
+            prefixIcon: const Icon(Icons.tag_rounded, color: primaryPurple, size: 20),
             suffixIcon: _subscriptionIdCtrl.text.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.cancel_rounded,
@@ -717,7 +751,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: borderColor, width: 1.2)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: primaryCyan, width: 2)),
+                borderSide: const BorderSide(color: primaryPurple, width: 2)),
             errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
                 borderSide: const BorderSide(color: accentRed, width: 1.2)),
             focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
@@ -734,10 +768,14 @@ class _ElectricityScreenState extends State<ElectricityScreen>
         const SizedBox(height: 22),
 
         // ── 2. Operators (API) ────────────────────────────────────────────────
-        const Row(children: [
-          Icon(Icons.bolt_rounded, size: 18, color: primaryCyan),
-          SizedBox(width: 8),
-          Text('Operators',
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: chipLavender, borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.bolt_rounded, size: 16, color: primaryPurple),
+          ),
+          const SizedBox(width: 10),
+          const Text('Operators',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
         ]),
         const SizedBox(height: 10),
@@ -755,7 +793,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             child: _opsLoading
                 ? const Row(children: [
                     SizedBox(width: 20, height: 20,
-                        child: CircularProgressIndicator(color: primaryCyan, strokeWidth: 2)),
+                        child: CircularProgressIndicator(color: primaryPurple, strokeWidth: 2)),
                     SizedBox(width: 12),
                     Text('Loading operators…',
                         style: TextStyle(color: textMuted, fontSize: 14)),
@@ -778,19 +816,23 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: selLabel == null ? FontWeight.w400 : FontWeight.w700,
-                          color: selLabel == null ? const Color(0xFF94A3B8) : textDark,
+                          color: selLabel == null ? const Color(0xFF9CA3AF) : textDark,
                         ),
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: primaryCyan.withValues(alpha: 0.1),
+                        color: chipLavender,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(_opsError != null ? 'Retry' : 'Choose',
-                          style: const TextStyle(fontSize: 12,
-                              fontWeight: FontWeight.w800, color: primaryCyan)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text(_opsError != null ? 'Retry' : 'Choose',
+                            style: const TextStyle(fontSize: 12,
+                                fontWeight: FontWeight.w800, color: primaryPurple)),
+                        const Icon(Icons.keyboard_arrow_down_rounded,
+                            color: primaryPurple, size: 16),
+                      ]),
                     ),
                   ]),
           ),
@@ -811,13 +853,48 @@ class _ElectricityScreenState extends State<ElectricityScreen>
           ),
         ],
 
+        // ── Instant Processing toggle (matches reference design) ──────────────
+        const SizedBox(height: 18),
+        const Divider(height: 1, color: Color(0xFFF1EFFB)),
+        const SizedBox(height: 14),
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: chipLavender, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.bolt_rounded, color: primaryPurple, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Instant Processing',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDark)),
+                SizedBox(height: 2),
+                Text('Direct settlement with state\nelectricity board',
+                    style: TextStyle(fontSize: 11.5, color: textMuted, height: 1.3)),
+              ],
+            ),
+          ),
+          Switch(
+            value: _instantProcessing,
+            activeThumbColor: Colors.white,
+            activeTrackColor: primaryPurple,
+            onChanged: (v) => setState(() => _instantProcessing = v),
+          ),
+        ]),
+
         // ── 3. Amount (shown once CA + operator selected) ─────────────────────
         if (_canShowAmount) ...[
-          const SizedBox(height: 22),
-          const Row(children: [
-            Icon(Icons.currency_rupee_rounded, size: 18, color: primaryCyan),
-            SizedBox(width: 8),
-            Text('Bill Amount (₹)',
+          const SizedBox(height: 18),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: chipLavender, borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.currency_rupee_rounded, size: 16, color: primaryPurple),
+            ),
+            const SizedBox(width: 10),
+            const Text('Bill Amount (₹)',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
           ]),
           const SizedBox(height: 10),
@@ -828,14 +905,14 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
             decoration: InputDecoration(
               hintText: 'Enter bill amount e.g. 850',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+              hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
               filled: true, fillColor: inputFill,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              prefixIcon: const Icon(Icons.currency_rupee, color: primaryCyan, size: 20),
+              prefixIcon: const Icon(Icons.currency_rupee, color: primaryPurple, size: 20),
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: borderColor, width: 1.2)),
               focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: primaryCyan, width: 2)),
+                  borderSide: const BorderSide(color: primaryPurple, width: 2)),
               errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: accentRed, width: 1.2)),
               focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16),
@@ -849,7 +926,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             },
           ),
           const SizedBox(height: 10),
-          // Quick amount chips
           Wrap(spacing: 8, runSpacing: 8,
             children: [500, 750, 1000, 1500, 2000, 3000].map((amt) {
               return InkWell(
@@ -858,18 +934,57 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: primaryCyan.withValues(alpha: 0.08),
+                    color: chipLavender,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryCyan.withValues(alpha: 0.25)),
+                    border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
                   ),
                   child: Text('₹$amt',
                       style: const TextStyle(fontSize: 11.5,
-                          fontWeight: FontWeight.bold, color: primaryCyan)),
+                          fontWeight: FontWeight.bold, color: primaryPurple)),
                 ),
               );
             }).toList(),
           ),
         ],
+
+        // ── 100% Secure Payments strip (matches reference design) ─────────────
+        const SizedBox(height: 20),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: chipLavender.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [primaryPurple, primaryPurpleDark]),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(Icons.shield_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('100% Secure Payments',
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800,
+                          color: primaryPurple)),
+                  SizedBox(height: 2),
+                  Text('Your transactions are protected\nwith bank-level security',
+                      style: TextStyle(fontSize: 11, color: textMuted, height: 1.3)),
+                ],
+              ),
+            ),
+            Container(
+              width: 34, height: 34,
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: const Icon(Icons.lock_rounded, color: primaryPurple, size: 16),
+            ),
+          ]),
+        ),
       ]),
     );
   }
@@ -883,7 +998,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
           padding: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           elevation: 6,
-          shadowColor: primaryCyan.withValues(alpha: 0.35),
+          shadowColor: primaryPurple.withValues(alpha: 0.35),
         ),
         onPressed: _submitting ? null : _handleProceed,
         child: Ink(
@@ -891,7 +1006,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             gradient: LinearGradient(
               colors: _submitting
                   ? [Colors.grey.shade400, Colors.grey.shade500]
-                  : [primaryCyan, primaryDark],
+                  : [primaryPurple, primaryPurpleDeep],
               begin: Alignment.centerLeft, end: Alignment.centerRight,
             ),
             borderRadius: BorderRadius.circular(18),
@@ -949,9 +1064,9 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              color: primaryCyan.withValues(alpha: 0.06),
+              color: chipLavender,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: primaryCyan.withValues(alpha: 0.2)),
+              border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
             ),
             child: Column(children: [
               const Text('Transaction Reference ID',
@@ -959,7 +1074,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
               const SizedBox(height: 6),
               Text(_merchantTxnId ?? '—',
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
-                      color: primaryCyan, letterSpacing: 0.5)),
+                      color: primaryPurple, letterSpacing: 0.5)),
             ]),
           ),
           const SizedBox(height: 26),
@@ -970,7 +1085,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                 _subscriptionIdCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
               }),
               style: ElevatedButton.styleFrom(
-                backgroundColor: primaryCyan, foregroundColor: Colors.white,
+                backgroundColor: primaryPurple, foregroundColor: Colors.white,
                 elevation: 3,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
@@ -978,77 +1093,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
             ),
           ),
-        ]),
-      ),
-    );
-  }
-
-  // ─── Assurance Card ───────────────────────────────────────────────────────
-  Widget _buildAssuranceListCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: cardWhite, borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-            blurRadius: 18, offset: const Offset(0, 6))],
-      ),
-      child: Column(children: [
-        _buildAssuranceTile(0, Icons.bolt_rounded, const Color(0xFFF59E0B),
-            'Instant Processing', 'Direct settlement with state electricity board',
-            '⚡ Real-time direct bill settlement with your state power distribution company.'),
-        const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-        _buildAssuranceTile(1, Icons.shield_rounded, const Color(0xFF10B981),
-            '100% BBPS Secure Payment', 'Encrypted transactions protected by BBPS',
-            '🛡️ End-to-end 256-bit SSL encrypted transaction by NPCI.'),
-        const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-        _buildAssuranceTile(2, Icons.receipt_long_rounded, primaryCyan,
-            'Instant Digital Receipt', 'Tax compliant proof of electricity bill payment',
-            '🧾 Download official BBPS receipt instantly after payment.'),
-      ]),
-    );
-  }
-
-  Widget _buildAssuranceTile(int index, IconData icon, Color color,
-      String title, String subtitle, String detail) {
-    final isExpanded = _expandedAssuranceIndex == index;
-    return InkWell(
-      onTap: () => setState(() =>
-          _expandedAssuranceIndex = isExpanded ? null : index),
-      borderRadius: BorderRadius.circular(28),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontSize: 14,
-                  fontWeight: FontWeight.w700, color: textDark)),
-              const SizedBox(height: 2),
-              Text(subtitle, style: const TextStyle(fontSize: 12, color: textMuted)),
-            ])),
-            Icon(isExpanded ? Icons.keyboard_arrow_up_rounded
-                : Icons.keyboard_arrow_down_rounded,
-                color: primaryCyan, size: 22),
-          ]),
-          if (isExpanded) ...[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity, padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: primaryCyan.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: primaryCyan.withValues(alpha: 0.15)),
-              ),
-              child: Text(detail, style: const TextStyle(fontSize: 12.5,
-                  fontWeight: FontWeight.w600, color: primaryDark, height: 1.35)),
-            ),
-          ],
         ]),
       ),
     );

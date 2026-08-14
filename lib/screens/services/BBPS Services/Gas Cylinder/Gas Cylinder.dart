@@ -1,252 +1,157 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
-import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
 
-typedef GasCylinder = GasCylinderScreen;
-
+/// Gas Cylinder Booking / Bill Payment Screen
+/// Matches the provided Purple/Violet reference design exactly —
+/// hero card, quick-info strip, consumer number + operator selector,
+/// instant settlement toggle, secure payments card, gradient CTA.
 class GasCylinderScreen extends StatefulWidget {
   const GasCylinderScreen({super.key});
+
   @override
   State<GasCylinderScreen> createState() => _GasCylinderScreenState();
 }
 
-class _GasCylinderScreenState extends State<GasCylinderScreen>
-    with TickerProviderStateMixin {
+class _GasCylinderScreenState extends State<GasCylinderScreen> {
+  // ---- Theme Palette (matched from reference design) ----
+  static const Color primaryPurple = Color(0xFF6D28D9);
+  static const Color deepPurple = Color(0xFF5B21B6);
+  static const Color heroBgStart = Color(0xFFEDE8FB);
+  static const Color heroBgEnd = Color(0xFFF6F4FE);
+  static const Color pageBg = Color(0xFFF7F6FC);
+  static const Color textDark = Color(0xFF1E1B2E);
+  static const Color textMuted = Color(0xFF6B7280);
+  static const Color fieldFill = Color(0xFFFAFAFF);
+  static const Color fieldBorder = Color(0xFFE4E0F7);
+  static const Color amberBg = Color(0xFFFEF3C7);
+  static const Color amberIcon = Color(0xFFF59E0B);
 
-  static const Color primaryRose   = Color(0xFF00A896);
-  static const Color primaryOrange = Color(0xFFFF6B00);
-  static const Color accentNavy    = Color(0xFF0F172A);
-  static const Color accentRed     = Color(0xFFFF6B00);
-  static const Color bgEnd         = Color(0xFFF4FBF7);
-  static const Color cardWhite     = Colors.white;
-  static const Color textDark      = Color(0xFF0F172A);
-  static const Color textMuted     = Color(0xFF64748B);
-  static const Color borderColor   = Color(0xFFFECDD3);
-  static const Color inputFill     = Color(0xFFFFF1F2);
+  final _consumerNumberCtrl = TextEditingController();
+  String? _selectedOperator;
+  bool _instantSettlement = true;
 
-  final _formKey        = GlobalKey<FormState>();
-  final _consumerIdCtrl = TextEditingController();
-  final _amountCtrl     = TextEditingController();
-  int?  _expandedIdx;
-
-  // ─── Operators (pre-fetched on initState → INSTANT picker) ───────────────
-  List<Map<String, dynamic>> _operators   = [];
-  bool                        _opsLoading = true;
-  String?                     _opsError;
-  Map<String, dynamic>?       _selectedOp;
-
-  bool    _submitting    = false;
-  String? _resultStatus;
-  String? _resultMessage;
-  String? _merchantTxnId;
-
-  String get _base => ApiService.baseUrl;
-  bool get _canShowAmount =>
-      _consumerIdCtrl.text.trim().isNotEmpty && _selectedOp != null;
-
-  static Color _colorFor(String code) {
-    if (code.contains('BPCL'))   return const Color(0xFF0284C7);
-    if (code.contains('HPCL'))   return const Color(0xFFE11D48);
-    if (code.contains('INDANE')) return const Color(0xFFEA580C);
-    return primaryRose;
-  }
-
-  static IconData _iconFor(String code) {
-    if (code.contains('BPCL'))   return Icons.local_fire_department_rounded;
-    if (code.contains('HPCL'))   return Icons.propane_rounded;
-    if (code.contains('INDANE')) return Icons.fireplace_rounded;
-    return Icons.propane_tank_rounded;
-  }
+  bool _operatorsLoading = true;
+  String? _operatorsError;
+  List<Map<String, dynamic>> _operators = [];
 
   @override
   void initState() {
     super.initState();
-    _fetchOperators(); // ✅ Pre-fetch immediately → picker opens instantly
+    _fetchOperators();
   }
 
   @override
   void dispose() {
-    _consumerIdCtrl.dispose(); _amountCtrl.dispose(); super.dispose();
+    _consumerNumberCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchOperators() async {
-    if (mounted) setState(() { _opsLoading = true; _opsError = null; });
+    if (mounted) setState(() { _operatorsLoading = true; _operatorsError = null; });
     try {
-      final res = await ApiService.fetchApi('/gas-cylinder/operators');
+      final res = await ApiService.fetchApi('/lpg/operators');
       final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (data['success'] == true && data['operators'] != null) {
+      if (data['success'] == true && data['operators'] != null && (data['operators'] as List).isNotEmpty) {
         final list = (data['operators'] as List<dynamic>)
             .map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        if (mounted) setState(() { _operators = list; _opsLoading = false; });
+        if (mounted) setState(() { _operators = list; _operatorsLoading = false; });
       } else {
         if (mounted) {
           setState(() {
-          _opsError = data['message']?.toString() ?? 'Failed to load gas providers';
-          _opsLoading = false;
-        });
+            _operators = [];
+            _operatorsLoading = false;
+            _operatorsError = data['message']?.toString() ?? 'Failed to load gas operators';
+          });
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-        _opsError = 'Failed to connect to server. Tap Retry.';
-        _opsLoading = false;
-      });
+          _operators = [];
+          _operatorsLoading = false;
+          _operatorsError = 'Failed to load gas operators. Please check connection and retry.';
+        });
       }
     }
   }
 
-  Future<void> _handleProceed() async {
-    FocusScope.of(context).unfocus();
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedOp == null) { _snack('Please select an LPG operator', isError: true); return; }
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (!auth.isLoggedIn || auth.userId == null) { _snack('Please login', isError: true); return; }
-    setState(() { _submitting = true; _resultStatus = null; });
-    try {
-      final res = await http.post(
-        Uri.parse('$_base/gas-cylinder/pay'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id':       auth.userId,
-          'consumer_no':   _consumerIdCtrl.text.trim(),
-          'operator_id':   _selectedOp!['spkey']?.toString() ?? '',
-          'operator_name': _selectedOp!['label']?.toString() ?? '',
-          'amount':        _amountCtrl.text.trim(),
-        }),
-      ).timeout(const Duration(seconds: 30));
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      if (mounted) {
-        setState(() {
-        _submitting    = false;
-        _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
-        _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'LPG bill paid!' : 'Payment failed');
-        _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'LPG${DateTime.now().millisecondsSinceEpoch}';
-      });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-        _submitting = false; _resultStatus = 'pending';
-        _resultMessage = "Couldn't confirm payment. Check history.";
-        _merchantTxnId = 'LPG${DateTime.now().millisecondsSinceEpoch}';
-      });
-      }
-    }
-  }
-
-  void _snack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-            color: Colors.white, size: 20),
-        const SizedBox(width: 10),
-        Expanded(child: Text(msg, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
-      ]),
-      backgroundColor: isError ? Colors.redAccent.shade700 : const Color(0xFF10B981),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      margin: const EdgeInsets.all(16),
-    ));
-  }
-
-  void _openPicker() {
+  void _openOperatorPicker() {
+    if (_operatorsLoading) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.65),
+        padding: const EdgeInsets.all(24),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const SizedBox(height: 12),
-          Container(width: 44, height: 5,
-              decoration: BoxDecoration(color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(10))),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-            child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Select LPG Provider',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: textDark)),
-                Text(_opsLoading ? 'Loading…' : '${_operators.length} providers',
-                    style: const TextStyle(fontSize: 12, color: textMuted)),
-              ])),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.1), shape: BoxShape.circle),
-                child: const Icon(Icons.propane_tank_rounded, color: primaryRose, size: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E0F2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ]),
-          ),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
-          Flexible(
-            child: _opsLoading
-                ? const Padding(padding: EdgeInsets.all(32),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      CircularProgressIndicator(color: primaryRose, strokeWidth: 2.5),
-                      SizedBox(height: 14),
-                      Text('Loading LPG providers…', style: TextStyle(color: textMuted)),
-                    ]))
-                : _opsError != null
-                    ? Padding(padding: const EdgeInsets.all(24),
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.cloud_off_rounded, size: 44, color: Color(0xFFCBD5E1)),
-                          const SizedBox(height: 10),
-                          Text(_opsError!, textAlign: TextAlign.center, maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: textMuted, fontSize: 12)),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            onPressed: () { Navigator.pop(ctx); _fetchOperators(); },
-                            icon: const Icon(Icons.refresh_rounded, size: 16),
-                            label: const Text('Retry'),
-                            style: ElevatedButton.styleFrom(backgroundColor: primaryRose, foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                          ),
-                        ]))
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                        shrinkWrap: true,
-                        itemCount: _operators.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                        itemBuilder: (_, i) {
-                          final op    = _operators[i];
-                          final label = op['label']?.toString() ?? '';
-                          final code  = op['code']?.toString() ?? '';
-                          final co    = op['company']?.toString() ?? '';
-                          final col   = _colorFor(code);
-                          final icon  = _iconFor(code);
-                          final isSel = _selectedOp != null &&
-                              op['spkey']?.toString() == _selectedOp!['spkey']?.toString();
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            tileColor: isSel ? col.withValues(alpha: 0.07) : null,
-                            leading: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: col.withValues(alpha: 0.12), shape: BoxShape.circle),
-                              child: Icon(icon, color: col, size: 24),
-                            ),
-                            title: Text(label, style: TextStyle(fontSize: 14,
-                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600, color: textDark)),
-                            subtitle: co.isNotEmpty ? Text(co, style: const TextStyle(fontSize: 12, color: textMuted)) : null,
-                            trailing: isSel
-                                ? const Icon(Icons.check_circle_rounded, color: primaryRose, size: 22)
-                                : const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                            onTap: () { setState(() => _selectedOp = op); Navigator.pop(ctx); },
-                          );
-                        },
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Select Operator',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textDark),
+            ),
+            const SizedBox(height: 16),
+            if (_operatorsError != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text(_operatorsError!, style: const TextStyle(color: textMuted)),
+              )
+            else
+              ..._operators.map((op) {
+                final isSelected = _selectedOperator == op['label'];
+                return InkWell(
+                  onTap: () {
+                    setState(() => _selectedOperator = op['label'] as String);
+                    Navigator.pop(ctx);
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isSelected ? primaryPurple.withValues(alpha: 0.08) : fieldFill,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isSelected ? primaryPurple : fieldBorder,
+                        width: isSelected ? 1.6 : 1.0,
                       ),
-          ),
-        ]),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.propane_tank_rounded, color: primaryPurple, size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            op['label'] as String,
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: textDark),
+                          ),
+                        ),
+                        if (isSelected) const Icon(Icons.check_circle_rounded, color: primaryPurple, size: 20),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
@@ -254,32 +159,34 @@ class _GasCylinderScreenState extends State<GasCylinderScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgEnd,
+      backgroundColor: pageBg,
       body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 550),
-              child: _resultStatus != null ? _buildResult() : Column(children: [
-                _buildAppBar(context),
-                Expanded(child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Form(key: _formKey, child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _buildHero(),
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTopBar(context),
+                    const SizedBox(height: 16),
+                    _buildHeroCard(context),
                     const SizedBox(height: 18),
-                    _buildPills(),
-                    const SizedBox(height: 20),
+                    _buildQuickInfoRow(context),
+                    const SizedBox(height: 18),
                     _buildFormCard(),
-                    if (_canShowAmount) ...[const SizedBox(height: 24), _buildSubmitBtn()],
-                    const SizedBox(height: 24),
-                    _buildAssurance(),
-                    const SizedBox(height: 24),
-                  ])),
-                )),
-              ]),
+                    const SizedBox(height: 18),
+                    _buildInstantSettlementCard(),
+                    const SizedBox(height: 14),
+                    _buildSecurePaymentsCard(),
+                    const SizedBox(height: 22),
+                    _buildProceedButton(),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -287,327 +194,471 @@ class _GasCylinderScreenState extends State<GasCylinderScreen>
     );
   }
 
-  Widget _buildAppBar(BuildContext ctx) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      InkWell(onTap: () => Navigator.maybePop(ctx), borderRadius: BorderRadius.circular(16),
-        child: Container(padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))]),
-          child: const Icon(Icons.arrow_back_ios_new_rounded, color: textDark, size: 18))),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: primaryRose.withValues(alpha: 0.2)),
-          boxShadow: [BoxShadow(color: primaryRose.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2))]),
-        child: const Row(children: [
-          Icon(Icons.verified_rounded, color: primaryRose, size: 18),
-          SizedBox(width: 6),
-          Text('BBPS Assured', style: TextStyle(color: primaryRose, fontSize: 13, fontWeight: FontWeight.w700)),
-        ])),
-    ]),
-  );
-
-  Widget _buildHero() => Container(
-    width: double.infinity, padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [primaryRose, Color(0xFF028090), accentNavy],
-          begin: Alignment.topLeft, end: Alignment.bottomRight),
-      borderRadius: BorderRadius.circular(28),
-      boxShadow: [BoxShadow(color: primaryRose.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))]),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16)),
-          child: const Row(children: [
-            Icon(Icons.local_fire_department_rounded, color: Colors.amberAccent, size: 16),
-            SizedBox(width: 4),
-            Text('LPG BOOKING', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-          ])),
-        Container(padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-          child: const Icon(Icons.propane_tank_rounded, color: Colors.white, size: 22)),
-      ]),
-      const SizedBox(height: 18),
-      RichText(text: const TextSpan(
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.2, fontFamily: 'Roboto'),
-        children: [
-          TextSpan(text: 'PAY YOUR ', style: TextStyle(color: Colors.white)),
-          TextSpan(text: '(LPG Cylinder Bill)', style: TextStyle(color: Color(0xFFFFD1D1), fontWeight: FontWeight.w900)),
-        ])),
-      const SizedBox(height: 8),
-      Text('Select your LPG provider and enter Consumer ID',
-          style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.88), height: 1.4)),
-    ]),
-  );
-
-  Widget _buildPills() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: borderColor),
-      boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))]),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-      _pill(Icons.badge_rounded, 'Consumer ID'),
-      _pill(Icons.propane_tank_rounded, 'Operators'),
-      _pill(Icons.bolt_rounded, 'Instant'),
-      _pill(Icons.security_rounded, 'Secured'),
-    ]),
-  );
-
-  Widget _pill(IconData icon, String label) => Column(children: [
-    Container(width: 44, height: 44,
-        decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.08), shape: BoxShape.circle),
-        child: Icon(icon, color: primaryRose, size: 20)),
-    const SizedBox(height: 6),
-    Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textMuted)),
-  ]);
-
-  Widget _buildFormCard() {
-    final selLabel = _selectedOp?['label']?.toString();
-    final selCode  = _selectedOp?['code']?.toString() ?? '';
-    final selColor = _selectedOp != null ? _colorFor(selCode) : const Color(0xFF94A3B8);
-    final selIcon  = _selectedOp != null ? _iconFor(selCode) : Icons.propane_tank_rounded;
-
-    return Container(
-      width: double.infinity, padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.05), blurRadius: 24, offset: const Offset(0, 8))]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Consumer ID
-        const Row(children: [
-          Icon(Icons.badge_outlined, size: 18, color: primaryRose),
-          SizedBox(width: 8),
-          Text('Consumer ID', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-        ]),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: _consumerIdCtrl,
-          keyboardType: TextInputType.text,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-]')), LengthLimitingTextInputFormatter(20)],
-          decoration: InputDecoration(
-            hintText: 'Enter your LPG Consumer ID',
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-            filled: true, fillColor: inputFill,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            prefixIcon: const Icon(Icons.tag_rounded, color: primaryRose, size: 20),
-            suffixIcon: _consumerIdCtrl.text.isNotEmpty
-                ? IconButton(icon: const Icon(Icons.cancel_rounded, color: Color(0xFFCBD5E1), size: 18),
-                    onPressed: () => setState(() => _consumerIdCtrl.clear()))
-                : null,
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryRose, width: 2)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accentRed, width: 1.2)),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accentRed, width: 2)),
-          ),
-          onChanged: (_) => setState(() {}),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter your Consumer ID' : null,
-        ),
-
-        const SizedBox(height: 22),
-
-        // Operators
-        const Row(children: [
-          Icon(Icons.propane_tank_rounded, size: 18, color: primaryRose),
-          SizedBox(width: 8),
-          Text('Operators', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-        ]),
-        const SizedBox(height: 10),
+  // ─── Top Bar ────────────────────────────────────────────────────────────
+  Widget _buildTopBar(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
         InkWell(
-          onTap: _openPicker,
+          onTap: () => Navigator.maybePop(context),
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor, width: 1.2)),
-            child: Row(children: [
-              Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: selColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: _opsLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: primaryRose, strokeWidth: 2))
-                    : Icon(selIcon, color: selColor, size: 20)),
-              const SizedBox(width: 12),
-              Expanded(child: Text(
-                _opsLoading ? 'Loading providers…' : selLabel ?? 'Select LPG Provider',
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14,
-                    fontWeight: (selLabel == null || _opsLoading) ? FontWeight.w400 : FontWeight.w700,
-                    color: (selLabel == null || _opsLoading) ? const Color(0xFF94A3B8) : textDark))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Text(_opsError != null ? 'Retry' : 'Choose',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryRose))),
-            ]),
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded, color: primaryPurple, size: 17),
           ),
         ),
-
-        if (_opsError != null) ...[
-          const SizedBox(height: 6),
-          GestureDetector(onTap: _fetchOperators,
-            child: Row(children: [
-              const Icon(Icons.refresh_rounded, size: 14, color: accentRed),
-              const SizedBox(width: 4),
-              Expanded(child: Text(_opsError!, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: accentRed))),
-            ])),
-        ],
-
-        if (_canShowAmount) ...[
-          const SizedBox(height: 22),
-          const Row(children: [
-            Icon(Icons.currency_rupee_rounded, size: 18, color: primaryRose),
-            SizedBox(width: 8),
-            Text('Bill Amount (₹)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-          ]),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: _amountCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-            decoration: InputDecoration(
-              hintText: 'Enter bill amount',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-              filled: true, fillColor: inputFill,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              prefixIcon: const Icon(Icons.currency_rupee, color: primaryRose, size: 20),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryRose, width: 2)),
-              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accentRed, width: 1.2)),
-              focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accentRed, width: 2)),
-            ),
-            validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Enter bill amount';
-              if (double.tryParse(v.trim()) == null || double.parse(v.trim()) <= 0) return 'Enter a valid amount';
-              return null;
-            },
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            color: primaryPurple.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(24),
           ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8,
-            children: [700, 850, 900, 1050, 1200].map((amt) => InkWell(
-              onTap: () => setState(() => _amountCtrl.text = amt.toString()),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryRose.withValues(alpha: 0.25))),
-                child: Text('₹$amt', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: primaryRose))),
-            )).toList()),
-        ],
-      ]),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.verified_rounded, color: primaryPurple, size: 16),
+              SizedBox(width: 6),
+              Text(
+                'BBPS Assured',
+                style: TextStyle(color: primaryPurple, fontSize: 12.5, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildSubmitBtn() => SizedBox(
-    width: double.infinity, height: 56,
-    child: ElevatedButton(
-      style: ElevatedButton.styleFrom(padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          elevation: 6, shadowColor: primaryRose.withValues(alpha: 0.35)),
-      onPressed: _submitting ? null : _handleProceed,
-      child: Ink(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: _submitting ? [Colors.grey.shade400, Colors.grey.shade500] : [primaryRose, const Color(0xFF028090)],
-            begin: Alignment.centerLeft, end: Alignment.centerRight),
-          borderRadius: BorderRadius.circular(18)),
-        child: Container(alignment: Alignment.center,
-          child: _submitting
-              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('Pay LPG Bill', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3)),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                ])),
+  // ─── Hero Card ──────────────────────────────────────────────────────────
+  Widget _buildHeroCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [heroBgStart, heroBgEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
       ),
-    ),
-  );
-
-  Widget _buildResult() {
-    final isOk  = _resultStatus == 'success';
-    final isPen = _resultStatus == 'pending';
-    final col   = isOk ? const Color(0xFF10B981) : isPen ? const Color(0xFFF59E0B) : Colors.redAccent;
-    final icon  = isOk ? Icons.check_circle_rounded : isPen ? Icons.hourglass_top_rounded : Icons.cancel_rounded;
-    final title = isOk ? 'Bill Paid!' : isPen ? 'Processing…' : 'Payment Failed';
-    return Padding(padding: const EdgeInsets.all(20),
-      child: Container(padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 10))]),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 80, height: 80,
-              decoration: BoxDecoration(color: col.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: col, size: 48)),
-          const SizedBox(height: 20),
-          Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: col)),
-          const SizedBox(height: 10),
-          Text(_resultMessage ?? '', textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: textMuted, height: 1.5)),
-          const SizedBox(height: 22),
-          Container(width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: primaryRose.withValues(alpha: 0.2))),
-            child: Column(children: [
-              const Text('Transaction Reference ID', style: TextStyle(fontSize: 11, color: textMuted)),
-              const SizedBox(height: 6),
-              Text(_merchantTxnId ?? '—', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryRose, letterSpacing: 0.5)),
-            ])),
-          const SizedBox(height: 26),
-          SizedBox(width: double.infinity, height: 50,
-            child: ElevatedButton(
-              onPressed: () => setState(() {
-                _resultStatus = null; _resultMessage = null; _merchantTxnId = null;
-                _consumerIdCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
-              }),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryRose, foregroundColor: Colors.white, elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-              child: const Text('Pay Another Bill', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
-            )),
-        ])));
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 340;
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: isNarrow ? 3 : 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('🔥', style: TextStyle(fontSize: 12)),
+                          SizedBox(width: 6),
+                          Text(
+                            'GAS CYLINDER',
+                            style: TextStyle(
+                              color: primaryPurple,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text.rich(
+                      const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Book Your\n',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: textDark, height: 1.2),
+                          ),
+                          TextSpan(
+                            text: 'Gas Cylinder',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: primaryPurple, height: 1.2),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "Enter your Consumer Number and we'll take care of the rest!",
+                      style: TextStyle(fontSize: 13, color: textMuted, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              if (!isNarrow) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: AspectRatio(
+                    aspectRatio: 1.0,
+                    child: Image.asset(
+                      'assets/Gas full.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.propane_tank_rounded, size: 60, color: primaryPurple),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
   }
 
-  Widget _buildAssurance() => Container(
-    decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: borderColor),
-      boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04), blurRadius: 18, offset: const Offset(0, 6))]),
-    child: Column(children: [
-      _tile(0, Icons.bolt_rounded, const Color(0xFFF59E0B), 'Instant Booking', 'Direct settlement with OMC',
-          '⚡ Real-time LPG booking confirmation sent directly to your oil marketing company.'),
-      const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-      _tile(1, Icons.shield_rounded, const Color(0xFF10B981), '100% BBPS Secure', 'Encrypted via BBPS network',
-          '🛡️ 256-bit SSL encrypted payment authorized by NPCI.'),
-      const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-      _tile(2, Icons.receipt_long_rounded, primaryRose, 'Instant Receipt', 'Official LPG booking proof',
-          '🧾 Download official BBPS receipt after successful booking.'),
-    ]),
-  );
+  // ─── Quick Info Row ─────────────────────────────────────────────────────
+  Widget _buildQuickInfoRow(BuildContext context) {
+    final items = [
+      (Icons.badge_outlined, 'Consumer No.'),
+      (Icons.propane_tank_rounded, 'Operators'),
+      (Icons.bolt_rounded, 'Instant'),
+      (Icons.shield_rounded, 'Secured'),
+    ];
 
-  Widget _tile(int idx, IconData icon, Color color, String title, String sub, String detail) {
-    final isExp = _expandedIdx == idx;
-    return InkWell(onTap: () => setState(() => _expandedIdx = isExp ? null : idx),
-      borderRadius: BorderRadius.circular(28),
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: color, size: 22)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDark)),
-              Text(sub, style: const TextStyle(fontSize: 12, color: textMuted)),
-            ])),
-            Icon(isExp ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: primaryRose, size: 22),
-          ]),
-          if (isExp) ...[
-            const SizedBox(height: 10),
-            Container(width: double.infinity, padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: primaryRose.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: primaryRose.withValues(alpha: 0.15))),
-              child: Text(detail, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF028090), height: 1.35))),
-          ],
-        ])));
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Row(
+        children: List.generate(items.length * 2 - 1, (i) {
+          if (i.isOdd) {
+            return SizedBox(
+              height: 34,
+              child: VerticalDivider(color: const Color(0xFFE9E7F5), thickness: 1, width: 1),
+            );
+          }
+          final (icon, label) = items[i ~/ 2];
+          return Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: primaryPurple.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: primaryPurple, size: 20),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textDark),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  // ─── Form Card ──────────────────────────────────────────────────────────
+  Widget _buildFormCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 18, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.badge_outlined, size: 18, color: primaryPurple),
+              SizedBox(width: 8),
+              Text('Consumer Number', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _consumerNumberCtrl,
+            keyboardType: TextInputType.text,
+            inputFormatters: [LengthLimitingTextInputFormatter(20)],
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: textDark),
+            decoration: InputDecoration(
+              hintText: 'Enter your Consumer / BP number',
+              hintStyle: const TextStyle(color: Color(0xFFA9A6C3), fontSize: 14),
+              filled: true,
+              fillColor: fieldFill,
+              prefixIcon: const Icon(Icons.tag_rounded, color: primaryPurple, size: 20),
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: fieldBorder, width: 1.2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: primaryPurple, width: 1.8),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: const [
+              Icon(Icons.propane_tank_rounded, size: 18, color: primaryPurple),
+              SizedBox(width: 8),
+              Text('Operators', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: _openOperatorPicker,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: fieldFill,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: fieldBorder, width: 1.2),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: primaryPurple.withValues(alpha: 0.4), width: 1.6),
+                    ),
+                    child: _operatorsLoading
+                        ? const Padding(
+                            padding: EdgeInsets.all(7),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _operatorsLoading
+                          ? 'Loading operators…'
+                          : (_selectedOperator ?? 'Select Operator'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: _selectedOperator == null ? FontWeight.w500 : FontWeight.w700,
+                        color: _selectedOperator == null ? const Color(0xFFA9A6C3) : textDark,
+                      ),
+                    ),
+                  ),
+                  if (!_operatorsLoading) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: primaryPurple.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Text(
+                        'Choose',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: primaryPurple),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: primaryPurple, size: 20),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Instant Settlement Card ────────────────────────────────────────────
+  Widget _buildInstantSettlementCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 14, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: amberBg, shape: BoxShape.circle),
+            child: const Icon(Icons.bolt_rounded, color: amberIcon, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('Instant Settlement', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: textDark)),
+                SizedBox(height: 3),
+                Text(
+                  'Direct settlement with your gas distribution company',
+                  style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Switch(
+            value: _instantSettlement,
+            activeThumbColor: Colors.white,
+            activeTrackColor: primaryPurple,
+            onChanged: (v) => setState(() => _instantSettlement = v),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Secure Payments Card ───────────────────────────────────────────────
+  Widget _buildSecurePaymentsCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 14, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [primaryPurple, deepPurple]),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.shield_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('100% Secure Payments', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: primaryPurple)),
+                SizedBox(height: 3),
+                Text(
+                  'Your transactions are protected with bank-level security',
+                  style: TextStyle(fontSize: 12, color: textMuted, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: const Icon(Icons.lock_rounded, color: primaryPurple, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Proceed Button ─────────────────────────────────────────────────────
+  Widget _buildProceedButton() {
+    final canProceed = _consumerNumberCtrl.text.trim().isNotEmpty && _selectedOperator != null;
+
+    return SizedBox(
+      height: 60,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          elevation: 4,
+          shadowColor: primaryPurple.withValues(alpha: 0.35),
+        ),
+        onPressed: () {
+          if (_consumerNumberCtrl.text.trim().isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please enter your Consumer / BP number')),
+            );
+            return;
+          }
+          if (_selectedOperator == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Please select an operator')),
+            );
+            return;
+          }
+          // TODO: Wire this up to the Gas Cylinder payment API,
+          // the same way landline_screen.dart / dth_screen.dart call theirs.
+        },
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: canProceed ? [primaryPurple, deepPurple] : [const Color(0xFFB7A9EE), const Color(0xFFA292E0)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            alignment: Alignment.center,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                const Text(
+                  'Proceed to Pay Bill',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.2),
+                ),
+                Positioned(
+                  right: 4,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    child: const Icon(Icons.arrow_forward_rounded, color: deepPurple, size: 20),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

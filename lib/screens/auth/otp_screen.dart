@@ -14,12 +14,23 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   final _otpController = TextEditingController();
 
-  void _verifyOtp() async {
+void _verifyOtp() async {
     if (_otpController.text.length != 6) return;
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final result = widget.isRegistration
-        ? await auth.verifyRegisterOtp(widget.email, _otpController.text.trim())
-        : await auth.login(widget.email, _otpController.text.trim());
+    
+    // isRegistration true -> verify the registration OTP.
+    // isRegistration false -> this screen was being misused to call
+    // login() with the OTP as a "password", which is wrong. If this
+    // screen is ever reused for a forgot-password flow, it should call
+    // a dedicated resetPassword/verify method instead — not login().
+    if (!widget.isRegistration) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This screen only supports registration OTP verification.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+    
+    final result = await auth.verifyRegisterOtp(widget.email, _otpController.text.trim());
     if (result['success'] == true && mounted) {
       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const HomeScreen(isGuest: false)), (route) => false);
     } else if (mounted) {

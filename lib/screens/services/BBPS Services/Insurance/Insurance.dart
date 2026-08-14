@@ -19,15 +19,16 @@ class InsuranceScreen extends StatefulWidget {
 class _InsuranceScreenState extends State<InsuranceScreen>
     with TickerProviderStateMixin {
 
-  static const Color primaryLavender = Color(0xFF00A896);
-  static const Color accentPurple    = Color(0xFF028090);
-  static const Color accentNavy      = Color(0xFF0F172A);
-  static const Color bgEnd           = Color(0xFFF4FBF7);
-  static const Color cardWhite       = Colors.white;
-  static const Color textDark        = Color(0xFF2E1065);
-  static const Color textMuted       = Color(0xFF6B7280);
-  static const Color borderColor     = Color(0xFFE9D5FF);
-  static const Color inputBg         = Color(0xFFF8F0FF);
+  // ─── Theme Colors (Purple Template) ─────────────────────────────────────
+  static const Color primaryPurple     = Color(0xFF7C3AED);
+  static const Color primaryDarkPurple = Color(0xFF6D28D9);
+  static const Color accentBlue        = Color(0xFF3B82F6);
+  static const Color bgLavender        = Color(0xFFF5EEFF);
+  static const Color cardWhite         = Colors.white;
+  static const Color textDark          = Color(0xFF1E1B4B);
+  static const Color textMuted         = Color(0xFF6B7280);
+  static const Color borderColor       = Color(0xFFEDE4FF);
+  static const Color inputFill         = Color(0xFFF9F5FF);
 
   final _formKey            = GlobalKey<FormState>();
   final _subscriptionIdCtrl = TextEditingController();
@@ -35,9 +36,8 @@ class _InsuranceScreenState extends State<InsuranceScreen>
   final _emailCtrl          = TextEditingController();
   final _amountCtrl         = TextEditingController();
   final _searchCtrl         = TextEditingController();
-  int?  _expandedIdx;
 
-  // ─── Operators: pre-fetched on initState → INSTANT picker ────────────────
+  // ─── Operators State ──────────────────────────────────────────────────────
   List<Map<String, dynamic>> _operators   = [];
   bool                        _opsLoading = true;
   String?                     _opsError;
@@ -66,7 +66,7 @@ class _InsuranceScreenState extends State<InsuranceScreen>
     if (k.contains('max'))     return const Color(0xFF2563EB);
     if (k.contains('star'))    return const Color(0xFF0EA5E9);
     if (k.contains('religare')||k.contains('care')) return const Color(0xFF14B8A6);
-    return primaryLavender;
+    return primaryPurple;
   }
 
   static IconData _iconFor(String name) {
@@ -80,7 +80,7 @@ class _InsuranceScreenState extends State<InsuranceScreen>
   @override
   void initState() {
     super.initState();
-    _fetchOperators(); // ✅ Pre-fetch on screen open → INSTANT picker
+    _fetchOperators();
     _searchCtrl.addListener(() => setState(() {}));
   }
 
@@ -101,7 +101,7 @@ class _InsuranceScreenState extends State<InsuranceScreen>
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: primaryLavender,
+              primary: primaryPurple,
               onPrimary: Colors.white,
               onSurface: textDark,
             ),
@@ -129,17 +129,17 @@ class _InsuranceScreenState extends State<InsuranceScreen>
       } else {
         if (mounted) {
           setState(() {
-          _opsError = data['message']?.toString() ?? 'Failed to load insurance providers';
-          _opsLoading = false;
-        });
+            _opsError = data['message']?.toString() ?? 'Failed to load insurance providers';
+            _opsLoading = false;
+          });
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-        _opsError = 'Failed to connect to server. Tap Retry.';
-        _opsLoading = false;
-      });
+          _opsError = 'Failed to connect to server. Tap Retry.';
+          _opsLoading = false;
+        });
       }
     }
   }
@@ -164,23 +164,23 @@ class _InsuranceScreenState extends State<InsuranceScreen>
           'operator_name':   _selectedOp!['label']?.toString() ?? '',
           'amount':          _amountCtrl.text.trim(),
         }),
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 60));
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
-        _submitting    = false;
-        _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
-        _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'Insurance premium paid!' : 'Payment failed');
-        _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'INS${DateTime.now().millisecondsSinceEpoch}';
-      });
+          _submitting    = false;
+          _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
+          _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'Insurance premium paid!' : 'Payment failed');
+          _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'INS${DateTime.now().millisecondsSinceEpoch}';
+        });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-        _submitting = false; _resultStatus = 'pending';
-        _resultMessage = "Couldn't confirm payment. Check history.";
-        _merchantTxnId = 'INS${DateTime.now().millisecondsSinceEpoch}';
-      });
+          _submitting = false; _resultStatus = 'pending';
+          _resultMessage = "Couldn't confirm payment. Check history.";
+          _merchantTxnId = 'INS${DateTime.now().millisecondsSinceEpoch}';
+        });
       }
     }
   }
@@ -215,12 +215,16 @@ class _InsuranceScreenState extends State<InsuranceScreen>
 
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.90),
-            decoration: const BoxDecoration(color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const SizedBox(height: 12),
-              Container(width: 44, height: 5,
-                  decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(10))),
+              Container(
+                width: 44, height: 5,
+                decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(10)),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 10),
                 child: Row(children: [
@@ -230,24 +234,28 @@ class _InsuranceScreenState extends State<InsuranceScreen>
                     Text(_opsLoading ? 'Loading…' : '${_operators.length} insurance companies available',
                         style: const TextStyle(fontSize: 12, color: textMuted)),
                   ])),
-                  Container(padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.1), shape: BoxShape.circle),
-                    child: const Icon(Icons.shield_rounded, color: primaryLavender, size: 20)),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.shield_rounded, color: primaryPurple, size: 20),
+                  ),
                 ]),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 child: TextField(
-                  controller: _searchCtrl, onChanged: (_) => setModal(() {}),
+                  controller: _searchCtrl,
+                  onChanged: (_) => setModal(() {}),
                   decoration: InputDecoration(
                     hintText: 'Search insurance company name…',
                     hintStyle: const TextStyle(color: textMuted, fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded, color: primaryLavender, size: 20),
+                    prefixIcon: const Icon(Icons.search_rounded, color: primaryPurple, size: 20),
                     suffixIcon: _searchCtrl.text.isNotEmpty
                         ? IconButton(icon: const Icon(Icons.close_rounded, color: textMuted, size: 18),
                             onPressed: () { _searchCtrl.clear(); setModal(() {}); })
                         : null,
-                    filled: true, fillColor: inputBg,
+                    filled: true,
+                    fillColor: inputFill,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                   ),
@@ -257,14 +265,17 @@ class _InsuranceScreenState extends State<InsuranceScreen>
               const Divider(height: 1, color: Color(0xFFF1F5F9)),
               Flexible(
                 child: _opsLoading
-                    ? const Padding(padding: EdgeInsets.all(32),
+                    ? const Padding(
+                        padding: EdgeInsets.all(32),
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          CircularProgressIndicator(color: primaryLavender, strokeWidth: 2.5),
+                          CircularProgressIndicator(color: primaryPurple, strokeWidth: 2.5),
                           SizedBox(height: 14),
                           Text('Loading insurance companies…', style: TextStyle(color: textMuted)),
-                        ]))
+                        ]),
+                      )
                     : _opsError != null
-                        ? Padding(padding: const EdgeInsets.all(28),
+                        ? Padding(
+                            padding: const EdgeInsets.all(28),
                             child: Column(mainAxisSize: MainAxisSize.min, children: [
                               const Icon(Icons.cloud_off_rounded, size: 48, color: Color(0xFFCBD5E1)),
                               const SizedBox(height: 12),
@@ -276,13 +287,19 @@ class _InsuranceScreenState extends State<InsuranceScreen>
                                 onPressed: () { Navigator.pop(ctx); _fetchOperators(); },
                                 icon: const Icon(Icons.refresh_rounded, size: 16),
                                 label: const Text('Retry'),
-                                style: ElevatedButton.styleFrom(backgroundColor: primaryLavender, foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryPurple,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
                               ),
-                            ]))
+                            ]),
+                          )
                         : filtered.isEmpty
-                            ? const Padding(padding: EdgeInsets.all(32),
-                                child: Text('No insurance companies match your search', style: TextStyle(color: textMuted)))
+                            ? const Padding(
+                                padding: EdgeInsets.all(32),
+                                child: Text('No insurance companies match your search', style: TextStyle(color: textMuted)),
+                              )
                             : ListView.separated(
                                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                                 shrinkWrap: true,
@@ -299,18 +316,21 @@ class _InsuranceScreenState extends State<InsuranceScreen>
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                     tileColor: isSel ? col.withValues(alpha: 0.07) : null,
-                                    leading: Container(padding: const EdgeInsets.all(10),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(10),
                                       decoration: BoxDecoration(color: col.withValues(alpha: 0.12), shape: BoxShape.circle),
-                                      child: Icon(icon, color: col, size: 20)),
+                                      child: Icon(icon, color: col, size: 20),
+                                    ),
                                     title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis,
                                         style: TextStyle(fontSize: 13,
                                             fontWeight: isSel ? FontWeight.w800 : FontWeight.w600, color: textDark)),
                                     trailing: isSel
-                                        ? const Icon(Icons.check_circle_rounded, color: primaryLavender, size: 22)
+                                        ? const Icon(Icons.check_circle_rounded, color: primaryPurple, size: 22)
                                         : const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                                     onTap: () { setState(() => _selectedOp = op); Navigator.pop(ctx); },
                                   );
-                                }),
+                                },
+                              ),
               ),
             ]),
           );
@@ -322,7 +342,7 @@ class _InsuranceScreenState extends State<InsuranceScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgEnd,
+      backgroundColor: bgLavender,
       body: SafeArea(
         child: GestureDetector(
           onTap: () => FocusScope.of(context).unfocus(),
@@ -331,22 +351,29 @@ class _InsuranceScreenState extends State<InsuranceScreen>
               constraints: const BoxConstraints(maxWidth: 550),
               child: _resultStatus != null ? _buildResult() : Column(children: [
                 _buildAppBar(context),
-                Expanded(child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Form(key: _formKey, child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    _buildHero(),
-                    const SizedBox(height: 18),
-                    _buildPills(),
-                    const SizedBox(height: 20),
-                    _buildFormCard(),
-                    if (_canShowAmount) ...[const SizedBox(height: 24), _buildSubmitBtn()],
-                    const SizedBox(height: 24),
-                    _buildAssurance(),
-                    const SizedBox(height: 24),
-                  ])),
-                )),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        _buildHeroBanner(),
+                        const SizedBox(height: 16),
+                        _buildPillGrid(),
+                        const SizedBox(height: 16),
+                        _buildFormCard(),
+                        const SizedBox(height: 16),
+                        _buildHassleFreeCard(),
+                        const SizedBox(height: 20),
+                        _buildSubmitButton(),
+                        const SizedBox(height: 20),
+                        _buildSecurityFooter(),
+                        const SizedBox(height: 24),
+                      ]),
+                    ),
+                  ),
+                ),
               ]),
             ),
           ),
@@ -355,383 +382,628 @@ class _InsuranceScreenState extends State<InsuranceScreen>
     );
   }
 
+  // ─── Header Bar ──────────────────────────────────────────────────────────
   Widget _buildAppBar(BuildContext ctx) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      InkWell(onTap: () => Navigator.maybePop(ctx), borderRadius: BorderRadius.circular(16),
-        child: Container(padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(16),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))]),
-          child: const Icon(Icons.arrow_back_ios_new_rounded, color: textDark, size: 18))),
+      InkWell(
+        onTap: () => Navigator.maybePop(ctx),
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: cardWhite,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: const Icon(Icons.arrow_back_rounded, color: primaryPurple, size: 20),
+        ),
+      ),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: primaryLavender.withValues(alpha: 0.2)),
-          boxShadow: [BoxShadow(color: primaryLavender.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2))]),
-        child: const Row(children: [
-          Icon(Icons.verified_rounded, color: primaryLavender, size: 18),
-          SizedBox(width: 6),
-          Text('BBPS Assured', style: TextStyle(color: primaryLavender, fontSize: 13, fontWeight: FontWeight.w700)),
-        ])),
-    ]),
-  );
-
-  Widget _buildHero() => Container(
-    width: double.infinity, padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(colors: [primaryLavender, accentPurple, accentNavy],
-          begin: Alignment.topLeft, end: Alignment.bottomRight),
-      borderRadius: BorderRadius.circular(28),
-      boxShadow: [BoxShadow(color: primaryLavender.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))]),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(16)),
-          child: const Row(children: [
-            Icon(Icons.shield_rounded, color: Colors.amberAccent, size: 16),
-            SizedBox(width: 4),
-            Text('INSURANCE PREMIUM', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-          ])),
-        Container(padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
-          child: const Icon(Icons.health_and_safety_rounded, color: Colors.white, size: 22)),
-      ]),
-      const SizedBox(height: 18),
-      RichText(text: const TextSpan(
-        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.2, fontFamily: 'Roboto'),
-        children: [
-          TextSpan(text: 'PAY YOUR ', style: TextStyle(color: Colors.white)),
-          TextSpan(text: '(Insurance Premium)', style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.w900)),
-        ])),
-      const SizedBox(height: 8),
-      Text('Enter Policy No., DOB, Email and select your Insurance Provider',
-          style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.88), height: 1.4)),
-    ]),
-  );
-
-  Widget _buildPills() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: borderColor),
-      boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04), blurRadius: 16, offset: const Offset(0, 6))]),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-      _pill(Icons.receipt_long_rounded, 'Policy No.'),
-      _pill(Icons.shield_rounded, 'Insurers'),
-      _pill(Icons.bolt_rounded, 'Instant'),
-      _pill(Icons.security_rounded, 'Secured'),
-    ]),
-  );
-
-  Widget _pill(IconData icon, String label) => Column(children: [
-    Container(width: 44, height: 44,
-        decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.08), shape: BoxShape.circle),
-        child: Icon(icon, color: primaryLavender, size: 20)),
-    const SizedBox(height: 6),
-    Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textMuted)),
-  ]);
-
-  Widget _buildFormCard() {
-    final selLabel = _selectedOp?['label']?.toString();
-    final selColor = _selectedOp != null ? _colorFor(selLabel!) : const Color(0xFF94A3B8);
-    final selIcon  = _selectedOp != null ? _iconFor(selLabel!) : Icons.shield_outlined;
-
-    return Container(
-      width: double.infinity, padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: borderColor),
-        boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.05), blurRadius: 24, offset: const Offset(0, 8))]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Policy / Subscription ID
-        const Row(children: [
-          Icon(Icons.badge_outlined, size: 18, color: primaryLavender),
-          SizedBox(width: 8),
-          Text('Policy / Subscription Number', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-        ]),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: _subscriptionIdCtrl,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-\/]')), LengthLimitingTextInputFormatter(25)],
-          decoration: InputDecoration(
-            hintText: 'Enter Policy / Subscription Number',
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-            filled: true, fillColor: inputBg,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            prefixIcon: const Icon(Icons.receipt_long_rounded, color: primaryLavender, size: 20),
-            suffixIcon: _subscriptionIdCtrl.text.isNotEmpty
-                ? IconButton(icon: const Icon(Icons.cancel_rounded, color: Color(0xFFCBD5E1), size: 18),
-                    onPressed: () => setState(() => _subscriptionIdCtrl.clear()))
-                : null,
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryLavender, width: 2)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
-            focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
-          ),
-          onChanged: (_) => setState(() {}),
-          validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter Policy Number' : null,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3E8FF),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+          boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 2))],
         ),
-
-        const SizedBox(height: 18),
-
-        // Date of Birth
-        const Row(children: [
-          Icon(Icons.cake_outlined, size: 18, color: primaryLavender),
-          SizedBox(width: 8),
-          Text('Date of Birth (YYYY-MM-DD)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(color: primaryPurple, shape: BoxShape.circle),
+            child: const Icon(Icons.check_rounded, color: Colors.white, size: 11),
+          ),
+          const SizedBox(width: 7),
+          const Text('BBPS Assured', style: TextStyle(color: textDark, fontSize: 13, fontWeight: FontWeight.w800)),
+          const SizedBox(width: 6),
+          const Icon(Icons.settings_outlined, color: primaryPurple, size: 16),
         ]),
-        const SizedBox(height: 10),
-        InkWell(
-          onTap: _selectDateOfBirth,
-          borderRadius: BorderRadius.circular(16),
-          child: IgnorePointer(
-            child: TextFormField(
-              controller: _dobCtrl,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-              decoration: InputDecoration(
-                hintText: 'Select Date of Birth',
-                hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                filled: true, fillColor: inputBg,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                prefixIcon: const Icon(Icons.calendar_month_rounded, color: primaryLavender, size: 20),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryLavender, width: 2)),
-                errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
+      ),
+    ]),
+  );
+
+  // ─── Top Hero Banner ─────────────────────────────────────────────────────
+  Widget _buildHeroBanner() => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(20, 20, 16, 20),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFFEDE4FF), Color(0xFFDDD0FC), Color(0xFFEDEAFF)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
+      boxShadow: [
+        BoxShadow(color: primaryDarkPurple.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 8)),
+      ],
+    ),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+      Expanded(
+        flex: 6,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE5D5FC),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.shield_rounded, color: primaryPurple, size: 15),
+              SizedBox(width: 5),
+              Text('INSURANCE PREMIUM', style: TextStyle(color: primaryPurple, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          RichText(
+            text: const TextSpan(
+              style: TextStyle(fontSize: 20, height: 1.15, fontFamily: 'Roboto'),
+              children: [
+                TextSpan(text: 'Pay Your\n', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 20)),
+                TextSpan(text: 'Insurance\nPremium', style: TextStyle(color: primaryPurple, fontWeight: FontWeight.w900, fontSize: 23)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Enter your Policy details and select your provider to proceed.',
+            style: TextStyle(fontSize: 11.5, color: textMuted.withValues(alpha: 0.9), height: 1.3, fontWeight: FontWeight.w500),
+          ),
+        ]),
+      ),
+      Expanded(
+        flex: 5,
+        child: Center(
+          child: SizedBox(
+            height: 140,
+            child: Image.asset(
+              'assets/insurances.png',
+              fit: BoxFit.contain,
+              errorBuilder: (ctx, err, st) => Image.asset(
+                'assets/insurance.png',
+                fit: BoxFit.contain,
+                errorBuilder: (ctx2, err2, st2) => Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.shield_rounded, size: 64, color: primaryPurple),
+                ),
               ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Select Date of Birth' : null,
             ),
           ),
         ),
+      ),
+    ]),
+  );
 
-        const SizedBox(height: 18),
+  // ─── 4 Feature Pills Grid Card ───────────────────────────────────────────
+  Widget _buildPillGrid() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    decoration: BoxDecoration(
+      color: cardWhite,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: borderColor),
+      boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 4))],
+    ),
+    child: Row(children: [
+      Expanded(child: _pillItem(Icons.badge_outlined, 'Policy No.', 'Enter Details')),
+      Container(width: 1, height: 38, color: const Color(0xFFF1F5F9)),
+      Expanded(child: _pillItem(Icons.shield_outlined, 'Insurers', 'All Providers')),
+      Container(width: 1, height: 38, color: const Color(0xFFF1F5F9)),
+      Expanded(child: _pillItem(Icons.flash_on_outlined, 'Instant', 'Quick Pay')),
+      Container(width: 1, height: 38, color: const Color(0xFFF1F5F9)),
+      Expanded(child: _pillItem(Icons.security_outlined, 'Secured', '100% Safe')),
+    ]),
+  );
 
-        // Email ID
-        const Row(children: [
-          Icon(Icons.email_outlined, size: 18, color: primaryLavender),
-          SizedBox(width: 8),
-          Text('Email Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-        ]),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: _emailCtrl,
-          keyboardType: TextInputType.emailAddress,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-          decoration: InputDecoration(
-            hintText: 'Enter your Email address',
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-            filled: true, fillColor: inputBg,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            prefixIcon: const Icon(Icons.mail_rounded, color: primaryLavender, size: 20),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryLavender, width: 2)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
-          ),
-          onChanged: (_) => setState(() {}),
-          validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Enter your Email address';
-            if (!v.contains('@') || !v.contains('.')) return 'Enter a valid Email address';
-            return null;
-          },
+  Widget _pillItem(IconData icon, String title, String sub) => Column(children: [
+    Container(
+      width: 42, height: 42,
+      decoration: const BoxDecoration(color: Color(0xFFF3E8FF), shape: BoxShape.circle),
+      child: Icon(icon, color: primaryPurple, size: 20),
+    ),
+    const SizedBox(height: 8),
+    Text(title, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: textDark), textAlign: TextAlign.center, maxLines: 1),
+    const SizedBox(height: 2),
+    Text(sub, style: const TextStyle(fontSize: 10, color: textMuted), textAlign: TextAlign.center, maxLines: 1),
+  ]);
+
+  // ─── Input Form Card (Policy No + DOB + Email + Insurers + Amount) ─────
+  Widget _buildFormCard() {
+    final selLabel = _selectedOp?['label']?.toString();
+    final selColor = _selectedOp != null ? _colorFor(selLabel!) : primaryPurple;
+    final selIcon  = _selectedOp != null ? _iconFor(selLabel!) : Icons.shield_outlined;
+
+    return Column(children: [
+      // 1. Policy / Subscription Number Card
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardWhite,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: borderColor),
+          boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 4))],
         ),
-
-        const SizedBox(height: 22),
-
-        // Operators
-        const Row(children: [
-          Icon(Icons.shield_rounded, size: 18, color: primaryLavender),
-          SizedBox(width: 8),
-          Text('Operators', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
-        ]),
-        const SizedBox(height: 10),
-        InkWell(
-          onTap: _openPicker, borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(color: inputBg, borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderColor, width: 1.2)),
-            child: Row(children: [
-              Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: selColor.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: _opsLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: primaryLavender, strokeWidth: 2))
-                    : Icon(selIcon, color: selColor, size: 20)),
-              const SizedBox(width: 12),
-              Expanded(child: Text(
-                _opsLoading ? 'Loading insurance companies…' : selLabel ?? 'Select Insurance Provider',
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14,
-                    fontWeight: (selLabel == null || _opsLoading) ? FontWeight.w400 : FontWeight.w700,
-                    color: (selLabel == null || _opsLoading) ? const Color(0xFF94A3B8) : textDark))),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Text(_opsError != null ? 'Retry' : 'Choose',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryLavender))),
-            ]),
-          ),
-        ),
-
-        if (_opsError != null) ...[
-          const SizedBox(height: 6),
-          GestureDetector(onTap: _fetchOperators,
-            child: Row(children: [
-              const Icon(Icons.refresh_rounded, size: 14, color: Colors.redAccent),
-              const SizedBox(width: 4),
-              Expanded(child: Text(_opsError!, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 11, color: Colors.redAccent))),
-            ])),
-        ],
-
-        if (_canShowAmount) ...[
-          const SizedBox(height: 22),
-          const Row(children: [
-            Icon(Icons.currency_rupee_rounded, size: 18, color: primaryLavender),
-            SizedBox(width: 8),
-            Text('Premium Amount (₹)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.badge_outlined, color: primaryPurple, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Text('Policy / Subscription Number', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
           ]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 14),
           TextFormField(
-            controller: _amountCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
-            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+            controller: _subscriptionIdCtrl,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: textDark),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\-\/]')),
+              LengthLimitingTextInputFormatter(25),
+            ],
             decoration: InputDecoration(
-              hintText: 'Enter premium amount e.g. 5000',
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-              filled: true, fillColor: inputBg,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              prefixIcon: const Icon(Icons.currency_rupee, color: primaryLavender, size: 20),
+              hintText: 'Enter Policy / Subscription Number',
+              hintStyle: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 13.5),
+              filled: true,
+              fillColor: inputFill,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              prefixIcon: Container(
+                margin: const EdgeInsets.only(left: 14, right: 10),
+                alignment: Alignment.centerLeft,
+                width: 20,
+                child: const Text('#', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: primaryPurple)),
+              ),
+              suffixIcon: _subscriptionIdCtrl.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.cancel_rounded, color: Color(0xFFCBD5E1), size: 18),
+                      onPressed: () => setState(() => _subscriptionIdCtrl.clear()),
+                    )
+                  : null,
               enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryLavender, width: 2)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryPurple, width: 2)),
               errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
               focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
             ),
+            onChanged: (_) => setState(() {}),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter Policy Number' : null,
+          ),
+
+          const SizedBox(height: 16),
+
+          // Date of Birth
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.cake_outlined, color: primaryPurple, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Text('Date of Birth (YYYY-MM-DD)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+          ]),
+          const SizedBox(height: 14),
+          InkWell(
+            onTap: _selectDateOfBirth,
+            borderRadius: BorderRadius.circular(16),
+            child: IgnorePointer(
+              child: TextFormField(
+                controller: _dobCtrl,
+                style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: textDark),
+                decoration: InputDecoration(
+                  hintText: 'Select Date of Birth',
+                  hintStyle: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 13.5),
+                  filled: true,
+                  fillColor: inputFill,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  prefixIcon: const Icon(Icons.calendar_month_rounded, color: primaryPurple, size: 20),
+                  suffixIcon: const Icon(Icons.calendar_today_outlined, color: primaryPurple, size: 18),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Select Date of Birth' : null,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Email Address
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Text('Email Address', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+          ]),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: textDark),
+            decoration: InputDecoration(
+              hintText: 'Enter your Email address',
+              hintStyle: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 13.5),
+              filled: true,
+              fillColor: inputFill,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              prefixIcon: const Icon(Icons.mail_rounded, color: primaryPurple, size: 20),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
+            ),
+            onChanged: (_) => setState(() {}),
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Enter premium amount';
-              if (double.tryParse(v.trim()) == null || double.parse(v.trim()) <= 0) return 'Enter a valid amount';
+              if (v == null || v.trim().isEmpty) return 'Enter your Email address';
+              if (!v.contains('@') || !v.contains('.')) return 'Enter a valid Email address';
               return null;
             },
           ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 8,
-            children: [1000, 2500, 5000, 10000, 15000, 25000].map((amt) => InkWell(
-              onTap: () => setState(() => _amountCtrl.text = amt.toString()),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryLavender.withValues(alpha: 0.25))),
-                child: Text('₹$amt', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: primaryLavender))),
-            )).toList()),
-        ],
-      ]),
-    );
+        ]),
+      ),
+
+      const SizedBox(height: 14),
+
+      // 2. Operators / Insurance Provider Selector Card
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: cardWhite,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: borderColor),
+          boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 4))],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: const Color(0xFFF3E8FF), borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.shield_rounded, color: primaryPurple, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Text('Insurers', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+          ]),
+          const SizedBox(height: 14),
+
+          // Selector box
+          InkWell(
+            onTap: _openPicker,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: inputFill,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderColor, width: 1.2),
+              ),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: selColor.withValues(alpha: 0.12), shape: BoxShape.circle),
+                  child: _opsLoading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: primaryPurple, strokeWidth: 2))
+                      : Icon(selIcon, color: selColor, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _opsLoading ? 'Loading insurers…' : selLabel ?? 'Select Insurance Provider',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: (selLabel == null || _opsLoading) ? FontWeight.w500 : FontWeight.w700,
+                      color: (selLabel == null || _opsLoading) ? const Color(0xFF94A3B8) : textDark,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text(_opsError != null ? 'Retry' : 'Choose',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryPurple)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: primaryPurple, size: 16),
+                  ]),
+                ),
+              ]),
+            ),
+          ),
+
+          // Error banner if backend connection failed
+          if (_opsError != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFFECDD3)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.wifi_off_rounded, color: Color(0xFFE11D48), size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _opsError!,
+                    style: const TextStyle(fontSize: 11.5, color: Color(0xFFE11D48), fontWeight: FontWeight.w600, height: 1.3),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _fetchOperators,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(12)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.refresh_rounded, color: primaryPurple, size: 14),
+                      SizedBox(width: 4),
+                      Text('Retry', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: primaryPurple)),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+
+          // Dynamic Amount input (shown when all fields valid)
+          if (_canShowAmount) ...[
+            const SizedBox(height: 18),
+            const Row(children: [
+              Icon(Icons.currency_rupee_rounded, size: 18, color: primaryPurple),
+              SizedBox(width: 8),
+              Text('Premium Amount (₹)', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: textDark)),
+            ]),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              decoration: InputDecoration(
+                hintText: 'Enter premium amount e.g. 5000',
+                hintStyle: const TextStyle(color: Color(0xFFA5B4FC), fontSize: 13.5),
+                filled: true, fillColor: inputFill,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                prefixIcon: const Icon(Icons.currency_rupee, color: primaryPurple, size: 20),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: borderColor, width: 1.2)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+                errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 1.2)),
+                focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Colors.redAccent, width: 2)),
+              ),
+              validator: (v) {
+                if (v == null || v.trim().isEmpty) return 'Enter premium amount';
+                if (double.tryParse(v.trim()) == null || double.parse(v.trim()) <= 0) return 'Enter a valid amount';
+                return null;
+              },
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: [1000, 2500, 5000, 10000, 15000, 25000].map((amt) => InkWell(
+                onTap: () => setState(() => _amountCtrl.text = amt.toString()),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+                  ),
+                  child: Text('₹$amt', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: primaryPurple)),
+                ),
+              )).toList(),
+            ),
+          ],
+        ]),
+      ),
+    ]);
   }
 
-  Widget _buildSubmitBtn() => SizedBox(
-    width: double.infinity, height: 56,
+  // ─── Hassle-free Payments Card ───────────────────────────────────────────
+  Widget _buildHassleFreeCard() => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: cardWhite,
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: borderColor),
+      boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 4))],
+    ),
+    child: Row(children: [
+      Container(
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(color: Color(0xFFF3E8FF), shape: BoxShape.circle),
+        child: const Icon(Icons.shield_rounded, color: primaryPurple, size: 22),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Instant Policy Settlement', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textDark)),
+          const SizedBox(height: 2),
+          Text(
+            'Your insurance premium will be processed instantly and securely.',
+            style: TextStyle(fontSize: 11.5, color: textMuted.withValues(alpha: 0.85), height: 1.3),
+          ),
+        ]),
+      ),
+      const SizedBox(width: 10),
+      Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: inputFill,
+          shape: BoxShape.circle,
+          border: Border.all(color: borderColor),
+        ),
+        child: const Icon(Icons.arrow_forward_rounded, color: primaryPurple, size: 18),
+      ),
+    ]),
+  );
+
+  // ─── Submit Button ────────────────────────────────────────────────────────
+  Widget _buildSubmitButton() => SizedBox(
+    width: double.infinity,
+    height: 56,
     child: ElevatedButton(
-      style: ElevatedButton.styleFrom(padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          elevation: 6, shadowColor: primaryLavender.withValues(alpha: 0.35)),
+      style: ElevatedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        elevation: 6,
+        shadowColor: primaryPurple.withValues(alpha: 0.35),
+      ),
       onPressed: _submitting ? null : _handleProceed,
       child: Ink(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: _submitting ? [Colors.grey.shade400, Colors.grey.shade500] : [primaryLavender, accentPurple],
-            begin: Alignment.centerLeft, end: Alignment.centerRight),
-          borderRadius: BorderRadius.circular(18)),
-        child: Container(alignment: Alignment.center,
+            colors: _submitting
+                ? [Colors.grey.shade400, Colors.grey.shade500]
+                : [primaryPurple, accentBlue],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          alignment: Alignment.center,
           child: _submitting
               ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-              : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text('Pay Insurance Premium', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.3)),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                ])),
+              : Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+                    child: const Icon(Icons.lock_rounded, color: Colors.white, size: 16),
+                  ),
+                  Text(
+                    _canShowAmount ? 'Fetch Insurance & Proceed' : 'Fetch Insurance & Proceed',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.3),
+                  ),
+                  const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 22),
+                ]),
+        ),
       ),
     ),
   );
 
+  // ─── Security Footer Bar ────────────────────────────────────────────────
+  Widget _buildSecurityFooter() => Wrap(
+    alignment: WrapAlignment.center,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    spacing: 4,
+    runSpacing: 6,
+    children: [
+      Row(mainAxisSize: MainAxisSize.min, children: const [
+        Icon(Icons.verified_user_outlined, size: 13, color: textMuted),
+        SizedBox(width: 4),
+        Text('100% Secure Payments', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: textMuted)),
+      ]),
+      const Text('•', style: TextStyle(color: textMuted, fontSize: 10)),
+      Row(mainAxisSize: MainAxisSize.min, children: const [
+        Icon(Icons.lock_outline_rounded, size: 13, color: textMuted),
+        SizedBox(width: 4),
+        Text('Encrypted & Safe', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: textMuted)),
+      ]),
+      const Text('•', style: TextStyle(color: textMuted, fontSize: 10)),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+        child: const Text('BBPS', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: primaryPurple, letterSpacing: 0.5)),
+      ),
+    ],
+  );
+
+  // ─── Result Screen ───────────────────────────────────────────────────────
   Widget _buildResult() {
     final isOk  = _resultStatus == 'success';
     final isPen = _resultStatus == 'pending';
-    final col   = isOk ? const Color(0xFF10B981) : isPen ? const Color(0xFFF59E0B) : Colors.redAccent;
+    final col   = isOk ? const Color(0xFF10B981) : isPen ? const Color(0xFFF59E0B) : const Color(0xFFE11D48);
     final icon  = isOk ? Icons.check_circle_rounded : isPen ? Icons.hourglass_top_rounded : Icons.cancel_rounded;
-    final title = isOk ? 'Premium Paid!' : isPen ? 'Processing…' : 'Payment Failed';
-    return Padding(padding: const EdgeInsets.all(20),
-      child: Container(padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 10))]),
+    final title = isOk ? 'Premium Paid Successfully!' : isPen ? 'Payment Processing…' : 'Payment Failed';
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Container(
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: cardWhite,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [BoxShadow(color: primaryPurple.withValues(alpha: 0.1), blurRadius: 24, offset: const Offset(0, 10))],
+        ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 80, height: 80,
-              decoration: BoxDecoration(color: col.withValues(alpha: 0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: col, size: 48)),
+          Container(
+            width: 80, height: 80,
+            decoration: BoxDecoration(color: col.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(icon, color: col, size: 48),
+          ),
           const SizedBox(height: 20),
-          Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: col)),
+          Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: col)),
           const SizedBox(height: 10),
-          Text(_resultMessage ?? '', textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: textMuted, height: 1.5)),
+          Text(
+            _resultMessage ?? '',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13.5, color: textMuted, height: 1.5),
+          ),
           const SizedBox(height: 22),
-          Container(width: double.infinity,
+          Container(
+            width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: primaryLavender.withValues(alpha: 0.2))),
+            decoration: BoxDecoration(
+              color: primaryPurple.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+            ),
             child: Column(children: [
               const Text('Transaction Reference ID', style: TextStyle(fontSize: 11, color: textMuted)),
               const SizedBox(height: 6),
-              Text(_merchantTxnId ?? '—', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryLavender, letterSpacing: 0.5)),
-            ])),
+              Text(
+                _merchantTxnId ?? '—',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryPurple, letterSpacing: 0.5),
+              ),
+            ]),
+          ),
           const SizedBox(height: 26),
-          SizedBox(width: double.infinity, height: 50,
+          SizedBox(
+            width: double.infinity, height: 50,
             child: ElevatedButton(
               onPressed: () => setState(() {
                 _resultStatus = null; _resultMessage = null; _merchantTxnId = null;
                 _subscriptionIdCtrl.clear(); _dobCtrl.clear(); _emailCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
               }),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryLavender, foregroundColor: Colors.white, elevation: 3,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryPurple,
+                foregroundColor: Colors.white,
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
               child: const Text('Pay Another Premium', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
-            )),
-        ])));
-  }
-
-  Widget _buildAssurance() => Container(
-    decoration: BoxDecoration(color: cardWhite, borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: borderColor),
-      boxShadow: [BoxShadow(color: const Color(0xFF0F172A).withValues(alpha: 0.04), blurRadius: 18, offset: const Offset(0, 6))]),
-    child: Column(children: [
-      _tile(0, Icons.bolt_rounded, const Color(0xFFF59E0B), 'Instant Policy Settlement', 'Direct settlement with insurer', '⚡ Real-time insurance premium credited directly to policy account.'),
-      const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-      _tile(1, Icons.shield_rounded, const Color(0xFF10B981), '100% BBPS Secure', 'Encrypted via BBPS network', '🛡️ 256-bit SSL encrypted payment authorized by NPCI.'),
-      const Divider(height: 1, indent: 64, endIndent: 20, color: Color(0xFFF1F5F9)),
-      _tile(2, Icons.receipt_long_rounded, primaryLavender, 'Instant Receipt', 'Official policy payment proof', '🧾 Download official BBPS receipt after premium payment.'),
-    ]),
-  );
-
-  Widget _tile(int idx, IconData icon, Color color, String title, String sub, String detail) {
-    final isExp = _expandedIdx == idx;
-    return InkWell(onTap: () => setState(() => _expandedIdx = isExp ? null : idx),
-      borderRadius: BorderRadius.circular(28),
-      child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Container(padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(icon, color: color, size: 22)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDark)),
-              Text(sub, style: const TextStyle(fontSize: 12, color: textMuted)),
-            ])),
-            Icon(isExp ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: primaryLavender, size: 22),
-          ]),
-          if (isExp) ...[
-            const SizedBox(height: 10),
-            Container(width: double.infinity, padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: primaryLavender.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: primaryLavender.withValues(alpha: 0.15))),
-              child: Text(detail, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: accentPurple, height: 1.35))),
-          ],
-        ])));
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 }
