@@ -75,6 +75,13 @@ class AuthProvider extends ChangeNotifier {
     return result;
   }
 
+  Future<Map<String, dynamic>> resendOtp(String email, {String purpose = 'registration'}) async {
+    _loading = true; notifyListeners();
+    final result = await _api.resendOtp(email, purpose: purpose);
+    _loading = false; notifyListeners();
+    return result;
+  }
+
   Future<Map<String, dynamic>> login(String loginId, String password) async {
     _loading = true; notifyListeners();
     final result = await _api.login(loginId, password);

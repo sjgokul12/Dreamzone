@@ -107,6 +107,10 @@ class ApiService {
     return _post('/verify-register-otp', {'email': email, 'otp': otp});
   }
 
+  Future<Map<String, dynamic>> resendOtp(String email, {String purpose = 'registration'}) async {
+    return _post('/resend-otp', {'email': email, 'purpose': purpose});
+  }
+
   Future<Map<String, dynamic>> login(String loginId, String password) async {
     return _post('/login', {'login_id': loginId, 'password': password});
   }
