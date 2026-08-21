@@ -55,9 +55,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
 
   static const Color primaryTeal = Color(0xFFFF6B00);
   static const Color darkTeal = Color(0xFF7C6CF0);
-  static const Color accentCyan = Color(0xFF0284C7);
   static const Color bgCream = Color(0xFFF6F0FE);
-  static const Color cardWhite = Color(0xFFFFFFFF);
   static const Color textDark = Color(0xFF161A3A);
 
   Color _parseColor(dynamic c) {
@@ -113,18 +111,6 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
       default:
         return Icons.assured_workload;
     }
-  }
-
-  String _imageUrl(String? relativePath) {
-    if (relativePath == null || relativePath.trim().isEmpty) return '';
-    String path = relativePath.trim();
-    if (path.startsWith('http://') || path.startsWith('https://')) return path;
-    final base = ApiService.baseUrl;
-    if (base.endsWith('/api')) {
-      final root = base.substring(0, base.length - 4);
-      return path.startsWith('/') ? '$root$path' : '$root/$path';
-    }
-    return path.startsWith('/') ? '$base$path' : '$base/$path';
   }
 
   List<Map<String, dynamic>> get _allCombinedServices {
@@ -457,140 +443,385 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
     );
   }
 
-  // ==================== HEADER (MATCHING SCREENSHOT) ====================
+  // ==================== HEADER (MATCHING HOME SCREEN HERO CARD) ====================
   Widget _buildExploreHeaderAndSearch() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            height: 190,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Right-aligned Image
-                Positioned(
-                  right: -10,
-                  top: -20,
-                  child: Image.asset(
-                    'assets/Explore.png',
-                    width: 200, // Big size
-                    height: 200,
-                    fit: BoxFit.contain,
-                  ),
+          // ─── Hero Card with BackgrounddziA.png ───
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              image: const DecorationImage(
+                image: AssetImage('assets/BackgrounddziA.png'),
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-                // Left-aligned Text (Constrained so it doesn't overlap image)
-                Positioned(
-                  left: 0,
-                  right: 140, // Keeps text away from the 200px wide image on the right
-                  top: 30,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Top Row: DZI Logo & Pro Account Badge
+                  Row(
                     children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          ShaderMask(
-                            shaderCallback: (bounds) => const LinearGradient(
-                              colors: [Color(0xFF8B3DFF), Color(0xFFFF4B91)],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ).createShader(bounds),
-                            child: const Text(
-                              'Explore ',
+                      // Gradient DZI Infinity Logo
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFEC4899)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              'DZI',
                               style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
                                 color: Colors.white,
-                                letterSpacing: -0.5,
-                                height: 1.1,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                                height: 1.0,
                               ),
                             ),
-                          ),
+                            SizedBox(height: 1),
+                            Text(
+                              '∞',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.bold,
+                                height: 0.9,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           const Text(
-                            'All Services',
+                            'DZI Infinity',
                             style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w800,
                               color: Color(0xFF0F172A),
-                              letterSpacing: -0.5,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.3,
                               height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE9FE),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'PRO ACCOUNT',
+                              style: TextStyle(
+                                color: Color(0xFF7C3AED),
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
                     ],
                   ),
-                ),
-                // Search Box positioned over the bottom
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    height: 52,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+
+                  const SizedBox(height: 12),
+
+                  // 2. Welcome Back Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: const Color(0xFF0F172A).withValues(alpha: 0.05),
-                        width: 1.5,
-                      ),
+                      color: const Color(0xFFFAF5FF),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFF3E8FF)),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: Row(
-                      children: [
-                        const Icon(Icons.search, color: Color(0xFF0F172A), size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            onChanged: (v) => setState(() => _searchQuery = v),
-                            style: const TextStyle(
-                              color: Color(0xFF0F172A),
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            decoration: const InputDecoration(
-                              hintText: 'Start finding services (e.g., PAN, DTH, ...)',
-                              hintStyle: TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              border: InputBorder.none,
-                              isDense: true,
-                            ),
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'WELCOME BACK!',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                            color: Color(0xFF7C3AED),
                           ),
                         ),
-                        const Icon(
-                          Icons.mic_none_rounded,
-                          color: Color(0xFF8B3DFF),
-                          size: 22,
-                        ),
+                        SizedBox(width: 4),
+                        Text('👋', style: TextStyle(fontSize: 10.5)),
                       ],
                     ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // 3. Main Hero Heading
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Let's explore",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                          height: 1.15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) {
+                              return const LinearGradient(
+                                colors: [Color(0xFF5F33E1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ).createShader(bounds);
+                            },
+                            child: const Text(
+                              "DZI Infinity ",
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                                height: 1.15,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(7),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFEC4899).withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Text(
+                              "PRO",
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // 4. Status Chips
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6.5,
+                              height: 6.5,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF8B5CF6),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(color: Color(0xFF8B5CF6), blurRadius: 4),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                            const Text(
+                              'All systems online',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B), size: 12),
+                            SizedBox(width: 3),
+                            Text(
+                              'Instant service',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF334155),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ─── Modern Rounded Search Bar ───
+          Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: const Color(0xFFE2E8F0),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'Start finding services (e.g., PAN, DTH...)',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.mic_none_rounded,
+                    color: Colors.white,
+                    size: 16,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+
+          const SizedBox(height: 14),
           const Padding(
             padding: EdgeInsets.only(left: 4),
             child: Text(
               'Discover our comprehensive range of services',
               style: TextStyle(
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF0F172A),
               ),
