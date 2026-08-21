@@ -450,9 +450,10 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ─── Hero Card with BackgrounddziA.png (Clean Banner) ───
+          // ─── Hero Card with BackgrounddziA.png (Tall & Proportional) ───
           Container(
             width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 150),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               image: const DecorationImage(
@@ -469,34 +470,54 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(22, 30, 22, 30),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ShaderMask(
-                    shaderCallback: (bounds) {
-                      return const LinearGradient(
-                        colors: [Color(0xFF5F33E1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ).createShader(bounds);
-                    },
-                    child: const Text(
-                      "Explore ",
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -0.6,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ShaderMask(
+                        shaderCallback: (bounds) {
+                          return const LinearGradient(
+                            colors: [Color(0xFF5F33E1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ).createShader(bounds);
+                        },
+                        child: const Text(
+                          "Explore ",
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.6,
+                            height: 1.1,
+                          ),
+                        ),
                       ),
-                    ),
+                      const Text(
+                        "All",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.6,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 2),
                   const Text(
-                    "All Services",
+                    "Services",
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 28,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
                       letterSpacing: -0.6,
+                      height: 1.1,
                     ),
                   ),
                 ],
@@ -504,7 +525,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
             ),
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // ─── Modern Rounded Search Bar ───
           Container(
