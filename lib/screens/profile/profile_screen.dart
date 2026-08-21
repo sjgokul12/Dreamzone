@@ -10,7 +10,7 @@ import 'settings_screen.dart';
 import 'my_applications_screen.dart';
 import 'help_support_screen.dart';
 import 'about_screen.dart';
-import '../auth/welcome_screen.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final bool showBackButton;
@@ -998,7 +998,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               onPressed: () => Navigator.push(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (_, a, b) => const WelcomeScreen(),
+                  pageBuilder: (_, a, b) => const LoginScreen(),
                   transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
                 ),
               ),
@@ -1579,7 +1579,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             Navigator.pushAndRemoveUntil(
               context,
               PageRouteBuilder(
-                pageBuilder: (_, a, b) => const WelcomeScreen(),
+                pageBuilder: (_, a, b) => const LoginScreen(),
                 transitionsBuilder: (_, animation, _, child) {
                   return FadeTransition(opacity: animation, child: child);
                 },

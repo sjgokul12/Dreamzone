@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'config/app_theme.dart';
 import 'providers/auth_provider.dart';
 import 'screens/home/home_screen.dart';
-import 'screens/auth/welcome_screen.dart';
+import 'screens/auth/splash_screen.dart';
 import 'screens/admin/admin_login_screen.dart';
 
 void main() async {
@@ -57,9 +57,9 @@ class DZIApp extends StatelessWidget {
               Locale('ta'),
             ],
             locale: const Locale('en'),
-            initialRoute: auth.isLoggedIn ? '/home' : '/welcome',
+            initialRoute: '/splash',
             routes: {
-              '/welcome': (_) => const WelcomeScreen(),
+              '/splash': (_) => const SplashScreen(),
               '/home'  : (_) => const HomeScreen(isGuest: false),
               '/admin' : (_) => const AdminLoginScreen(),
             },
