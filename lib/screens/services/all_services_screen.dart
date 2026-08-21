@@ -453,7 +453,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
           // ─── Hero Card with BackgrounddziA.png (Tall & Proportional) ───
           Container(
             width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 150),
+            constraints: const BoxConstraints(minHeight: 225),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               image: const DecorationImage(

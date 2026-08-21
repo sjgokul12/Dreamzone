@@ -1118,10 +1118,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: Colors.white.withValues(alpha: 0.8),
                             width: 1.5,
                           ),
                           boxShadow: [
@@ -1148,10 +1148,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withValues(alpha: 0.35),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: Colors.white.withValues(alpha: 0.8),
                             width: 1.5,
                           ),
                           boxShadow: [
@@ -1209,14 +1209,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 const SizedBox(height: 16),
 
-                // ─── Welcome Badge ──────────────────────────────────────────
+                // ─── Welcome Badge (Glass Mirror) ───────────────────────────
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withValues(alpha: 0.35),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      color: Colors.white.withValues(alpha: 0.8),
                       width: 1.5,
                     ),
                     boxShadow: [
@@ -1299,7 +1299,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.9),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     width: 1.5,
                                   ),
                                   boxShadow: [
@@ -1331,7 +1331,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 const SizedBox(height: 12),
 
-                // ─── Status Chips (Line by Line) ────────────────────────────
+                // ─── Status Chips (Line by Line - Glass Mirror) ─────────────
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1339,10 +1339,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.8),
+                        color: Colors.white.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withValues(alpha: 0.8),
                           width: 1.5,
                         ),
                         boxShadow: [
@@ -1373,7 +1373,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF334155),
+                              color: Color(0xFF1E293B),
                             ),
                           ),
                         ],
@@ -1386,10 +1386,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.8),
+                        color: Colors.white.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withValues(alpha: 0.8),
                           width: 1.5,
                         ),
                         boxShadow: [
@@ -1410,7 +1410,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF334155),
+                              color: Color(0xFF1E293B),
                             ),
                           ),
                         ],
