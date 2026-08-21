@@ -143,25 +143,17 @@ class ApiService {
   // ==================== RECHARGE ====================
 
   Future<Map<String, dynamic>> getRechargeOperators(String type) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/recharge/operators?type=$type'),
-      ).timeout(const Duration(seconds: 60));
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {'success': false, 'operators': []};
-    }
+    return _get('/recharge/operators?type=$type');
   }
 
   Future<Map<String, dynamic>> getRechargeCircles() async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/recharge/circles'),
-      ).timeout(const Duration(seconds: 60));
-      return jsonDecode(response.body);
-    } catch (e) {
-      return {'success': false, 'circles': []};
-    }
+    return _get('/recharge/circles');
+  }
+
+  Future<Map<String, dynamic>> getRechargePlans(String operatorCode, String circle) async {
+    final op = Uri.encodeComponent(operatorCode);
+    final c = Uri.encodeComponent(circle);
+    return _get('/recharge/plans?operator=$op&circle=$c');
   }
 
   // Section list for a service (used by AllServicesScreen popup)

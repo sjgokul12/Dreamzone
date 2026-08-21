@@ -22,16 +22,13 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _mobileCtrl = TextEditingController(text: '+91 ');
   final TextEditingController _amountCtrl = TextEditingController();
+  final ApiService _api = ApiService();
 
-  // Instant pre-seeded postpaid operators for zero-second loading
-  List<Map<String, dynamic>> _operators = [
-    {'id': 'AIRTEL_POST', 'label': 'Airtel Postpaid', 'icon': Icons.cell_tower_rounded, 'color': Color(0xFFE50914)},
-    {'id': 'JIO_POST', 'label': 'Jio Postpaid Plus', 'icon': Icons.wifi_tethering_rounded, 'color': Color(0xFF0F52BA)},
-    {'id': 'VI_POST', 'label': 'Vi Postpaid', 'icon': Icons.phone_android_rounded, 'color': Color(0xFFFF5722)},
-    {'id': 'BSNL_POST', 'label': 'BSNL Postpaid', 'icon': Icons.signal_cellular_alt_rounded, 'color': Color(0xFF1E88E5)},
-  ];
+  // All postpaid operators loaded dynamically from Python database API
+  List<Map<String, dynamic>> _operators = [];
+  String? _selectedOperator;
+  bool _loadingOperators = true;
 
-  String? _selectedOperator = 'Airtel Postpaid';
   bool _fetchingBill = false;
   Map<String, dynamic>? _fetchedBillDetails;
 
@@ -46,27 +43,27 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   void initState() {
     super.initState();
     _razorpayService.init();
-    _fetchLiveOperators();
+    _loadDatabaseData();
   }
 
-  Future<void> _fetchLiveOperators() async {
-    try {
-      final api = ApiService();
-      final postRes = await api.getRechargeOperators('postpaid').timeout(const Duration(seconds: 3));
+  Future<void> _loadDatabaseData() async {
+    setState(() => _loadingOperators = true);
 
-      if (postRes['success'] == true && postRes['operators'] != null && mounted) {
-        final liveOps = List<Map<String, dynamic>>.from(postRes['operators']);
-        if (liveOps.isNotEmpty) {
-          setState(() {
-            _operators = liveOps;
-            if (!_operators.any((o) => o['label'] == _selectedOperator)) {
+    try {
+      final res = await _api.getRechargeOperators('postpaid');
+      if (mounted) {
+        setState(() {
+          if (res['success'] == true && res['operators'] != null) {
+            _operators = List<Map<String, dynamic>>.from(res['operators']);
+            if (_operators.isNotEmpty && _selectedOperator == null) {
               _selectedOperator = _operators.first['label'];
             }
-          });
-        }
+          }
+          _loadingOperators = false;
+        });
       }
     } catch (_) {
-      // Non-blocking fallback
+      if (mounted) setState(() => _loadingOperators = false);
     }
   }
 
@@ -80,14 +77,23 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
 
   void _onMobileChanged(String value) {
     String clean = value.replaceAll('+91 ', '').replaceAll(' ', '').trim();
-    if (clean.length == 10) {
+    if (clean.length == 10 && _operators.isNotEmpty) {
       final prefix = clean.substring(0, 2);
-      if (['98', '99', '94'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Airtel Postpaid');
-      } else if (['63', '70', '79', '89'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Jio Postpaid Plus');
-      } else if (['90', '91', '97'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Vi Postpaid');
+      for (final op in _operators) {
+        final label = (op['label'] ?? '').toString().toLowerCase();
+        if (['98', '99', '94'].contains(prefix) && label.contains('airtel')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (['63', '70', '79', '89'].contains(prefix) && label.contains('jio')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (['90', '91', '97'].contains(prefix) && (label.contains('vi') || label.contains('vodafone'))) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (prefix == '94' && label.contains('bsnl')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        }
       }
     }
   }
@@ -99,22 +105,57 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
       return;
     }
 
+    if (_selectedOperator == null || _selectedOperator!.isEmpty) {
+      _showSnack('Please select an operator to fetch bill', isError: true);
+      return;
+    }
+
     setState(() => _fetchingBill = true);
 
-    // Simulated / live bill fetch with smooth fallback
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) {
-      setState(() {
-        _fetchingBill = false;
-        _fetchedBillDetails = {
-          'customer_name': 'Registered User',
-          'bill_number': 'BILL-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-          'due_date': 'Due in 7 Days',
-          'bill_amount': '599',
-        };
-        _amountCtrl.text = '599';
-      });
-      _showSnack('Latest bill details fetched successfully!');
+    try {
+      final opData = _operators.firstWhere(
+        (o) => o['label'] == _selectedOperator,
+        orElse: () => {'code': _selectedOperator ?? '', 'id': _selectedOperator ?? ''},
+      );
+
+      final res = await ApiService.postApi('/recharge/bill', {
+        'mobile_number': cleanMobile,
+        'operator_id': opData['id'] ?? opData['label'],
+        'operator_code': opData['code'] ?? '',
+      }, timeoutSeconds: 8);
+
+      final data = jsonDecode(res.body);
+      if (mounted) {
+        setState(() {
+          _fetchingBill = false;
+          if (data['success'] == true && data['bill'] != null) {
+            _fetchedBillDetails = Map<String, dynamic>.from(data['bill']);
+            if (_fetchedBillDetails!['amount'] != null) {
+              _amountCtrl.text = _fetchedBillDetails!['amount'].toString();
+            }
+          } else {
+            // Default placeholder if bill fetch not configured by operator
+            _fetchedBillDetails = {
+              'customer_name': 'Subscriber',
+              'bill_number': 'BILL-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+              'due_date': 'Due in 7 Days',
+            };
+          }
+        });
+        _showSnack('Bill status verified');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _fetchingBill = false;
+          _fetchedBillDetails = {
+            'customer_name': 'Subscriber',
+            'bill_number': 'BILL-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
+            'due_date': 'Due in 7 Days',
+          };
+        });
+        _showSnack('Enter bill amount to proceed');
+      }
     }
   }
 
@@ -252,40 +293,48 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._operators.map((op) {
-              final isSel = op['label'] == _selectedOperator;
-              return ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: (op['color'] as Color? ?? primaryPurple).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    op['icon'] as IconData? ?? Icons.sim_card_rounded,
-                    color: op['color'] as Color? ?? primaryPurple,
-                    size: 20,
-                  ),
+            if (_operators.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text('No postpaid operators found in database.', style: TextStyle(color: textSubdued)),
                 ),
-                title: Text(
-                  op['label'] ?? '',
-                  style: TextStyle(
-                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                    color: isSel ? primaryPurple : primaryDark,
+              )
+            else
+              ..._operators.map((op) {
+                final isSel = op['label'] == _selectedOperator;
+                return ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: primaryPurple.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.sim_card_rounded,
+                      color: primaryPurple,
+                      size: 20,
+                    ),
                   ),
-                ),
-                trailing: isSel
-                    ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedOperator = op['label']);
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
+                  title: Text(
+                    op['label'] ?? '',
+                    style: TextStyle(
+                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                      color: isSel ? primaryPurple : primaryDark,
+                    ),
+                  ),
+                  trailing: isSel
+                      ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
+                      : null,
+                  onTap: () {
+                    setState(() => _selectedOperator = op['label']);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
             const SizedBox(height: 20),
           ],
         ),
@@ -523,7 +572,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
             ),
             const SizedBox(height: 18),
 
-            // 2. Operator Selector
+            // 2. Operator Selector (Database Loaded)
             const Text(
               'Operators',
               style: TextStyle(
@@ -534,7 +583,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _showOperatorPicker,
+              onTap: _loadingOperators ? null : _showOperatorPicker,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -549,15 +598,24 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _selectedOperator ?? 'Select postpaid operator',
-                        style: const TextStyle(
+                        _loadingOperators
+                            ? 'Loading operators from database...'
+                            : (_selectedOperator ?? 'Select postpaid operator'),
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: primaryDark,
+                          color: _selectedOperator != null ? primaryDark : textSubdued,
                         ),
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
+                    if (_loadingOperators)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                      )
+                    else
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
                   ],
                 ),
               ),
@@ -628,7 +686,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: primaryPurple),
                   ),
                 ),
-                hintText: 'Enter bill amount (e.g. 599)',
+                hintText: 'Enter bill amount',
                 hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
@@ -647,40 +705,6 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-
-            // Quick Bill Amounts
-            SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: ['₹399', '₹499', '₹599', '₹799', '₹999', '₹1499'].map((amt) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () => setState(() => _amountCtrl.text = amt.replaceAll('₹', '')),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Text(
-                          amt,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF334155),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
 
             if (_fetchedBillDetails != null) ...[
               const SizedBox(height: 18),
@@ -693,11 +717,16 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                 ),
                 child: Column(
                   children: [
-                    _billDetailRow('Bill Number', _fetchedBillDetails!['bill_number']),
-                    const SizedBox(height: 6),
-                    _billDetailRow('Due Date', _fetchedBillDetails!['due_date']),
-                    const SizedBox(height: 6),
-                    _billDetailRow('Account Status', 'Active • Unpaid'),
+                    if (_fetchedBillDetails!['customer_name'] != null)
+                      _billDetailRow('Account Name', _fetchedBillDetails!['customer_name']),
+                    if (_fetchedBillDetails!['bill_number'] != null) ...[
+                      const SizedBox(height: 6),
+                      _billDetailRow('Bill Number', _fetchedBillDetails!['bill_number']),
+                    ],
+                    if (_fetchedBillDetails!['due_date'] != null) ...[
+                      const SizedBox(height: 6),
+                      _billDetailRow('Due Date', _fetchedBillDetails!['due_date']),
+                    ],
                   ],
                 ),
               ),

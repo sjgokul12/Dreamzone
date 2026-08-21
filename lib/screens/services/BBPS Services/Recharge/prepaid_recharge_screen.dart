@@ -22,43 +22,18 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _mobileCtrl = TextEditingController(text: '+91 ');
   final TextEditingController _amountCtrl = TextEditingController();
+  final ApiService _api = ApiService();
 
-  // Instant pre-seeded operators for zero-second instant loading
-  List<Map<String, dynamic>> _operators = [
-    {'id': 'JIO', 'label': 'Jio Prepaid', 'icon': Icons.wifi_tethering_rounded, 'color': Color(0xFF0F52BA)},
-    {'id': 'AIRTEL', 'label': 'Airtel Prepaid', 'icon': Icons.cell_tower_rounded, 'color': Color(0xFFE50914)},
-    {'id': 'VI', 'label': 'Vi (Vodafone Idea)', 'icon': Icons.phone_android_rounded, 'color': Color(0xFFFF5722)},
-    {'id': 'BSNL', 'label': 'BSNL Prepaid', 'icon': Icons.signal_cellular_alt_rounded, 'color': Color(0xFF1E88E5)},
-    {'id': 'MTNL', 'label': 'MTNL Prepaid', 'icon': Icons.perm_phone_msg_rounded, 'color': Color(0xFF43A047)},
-  ];
+  // All data loaded dynamically from Python database API
+  List<Map<String, dynamic>> _operators = [];
+  List<String> _circles = [];
+  String? _selectedOperator;
+  String? _selectedCircle;
 
-  // Instant pre-seeded circles
-  List<String> _circles = [
-    'Tamil Nadu',
-    'Chennai',
-    'Karnataka',
-    'Andhra Pradesh & Telangana',
-    'Kerala',
-    'Maharashtra & Goa',
-    'Mumbai',
-    'Delhi NCR',
-    'Gujarat',
-    'UP East',
-    'UP West',
-    'West Bengal',
-    'Kolkata',
-    'Rajasthan',
-    'Punjab',
-    'Haryana',
-    'Madhya Pradesh & CG',
-    'Bihar & Jharkhand',
-    'Odisha',
-    'Assam & North East',
-    'All India',
-  ];
-
-  String? _selectedOperator = 'Jio Prepaid';
-  String? _selectedCircle = 'Tamil Nadu';
+  bool _loadingOperators = true;
+  bool _loadingCircles = true;
+  bool _loadingPlans = false;
+  List<Map<String, dynamic>> _livePlans = [];
 
   bool _submitting = false;
   String? _resultStatus;
@@ -67,55 +42,55 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
 
   final RazorpayService _razorpayService = RazorpayService();
 
-  // Quick popular plans for fast selection
-  final List<Map<String, dynamic>> _popularPlans = [
-    {'amount': '239', 'validity': '28 Days', 'data': '1.5 GB/Day', 'desc': 'Truly Unlimited Calls + 100 SMS/Day'},
-    {'amount': '299', 'validity': '28 Days', 'data': '2.0 GB/Day', 'desc': 'Truly Unlimited Calls + 100 SMS/Day + DZI Rewards'},
-    {'amount': '349', 'validity': '28 Days', 'data': '2.5 GB/Day', 'desc': 'Hero Unlimited + Weekend Data Rollover'},
-    {'amount': '666', 'validity': '70 Days', 'data': '1.5 GB/Day', 'desc': 'Unlimited 5G Data + Disney+ Hotstar Mobile'},
-    {'amount': '839', 'validity': '84 Days', 'data': '2.0 GB/Day', 'desc': 'Best Value 3 Months + Free Wynk/JioCinema'},
-    {'amount': '2999', 'validity': '365 Days', 'data': '2.5 GB/Day', 'desc': 'Annual Pack + Unlimited Voice + OTT Perks'},
-  ];
-
   @override
   void initState() {
     super.initState();
     _razorpayService.init();
-    // Fetch live operators in background without blocking UI
-    _fetchLiveOperators();
+    _loadDatabaseData();
   }
 
-  Future<void> _fetchLiveOperators() async {
-    try {
-      final api = ApiService();
-      final preRes = await api.getRechargeOperators('prepaid').timeout(const Duration(seconds: 3));
-      final circleRes = await api.getRechargeCircles().timeout(const Duration(seconds: 3));
+  Future<void> _loadDatabaseData() async {
+    setState(() {
+      _loadingOperators = true;
+      _loadingCircles = true;
+    });
 
-      if (preRes['success'] == true && preRes['operators'] != null && mounted) {
-        final liveOps = List<Map<String, dynamic>>.from(preRes['operators']);
-        if (liveOps.isNotEmpty) {
-          setState(() {
-            _operators = liveOps;
-            if (!_operators.any((o) => o['label'] == _selectedOperator)) {
+    try {
+      final results = await Future.wait([
+        _api.getRechargeOperators('prepaid'),
+        _api.getRechargeCircles(),
+      ]);
+
+      final opRes = results[0];
+      final circleRes = results[1];
+
+      if (mounted) {
+        setState(() {
+          if (opRes['success'] == true && opRes['operators'] != null) {
+            _operators = List<Map<String, dynamic>>.from(opRes['operators']);
+            if (_operators.isNotEmpty && _selectedOperator == null) {
               _selectedOperator = _operators.first['label'];
             }
-          });
-        }
-      }
+          }
 
-      if (circleRes['success'] == true && circleRes['circles'] != null && mounted) {
-        final liveCircs = List<String>.from(circleRes['circles']);
-        if (liveCircs.isNotEmpty) {
-          setState(() {
-            _circles = liveCircs;
-            if (!_circles.contains(_selectedCircle)) {
+          if (circleRes['success'] == true && circleRes['circles'] != null) {
+            _circles = List<String>.from(circleRes['circles']);
+            if (_circles.isNotEmpty && _selectedCircle == null) {
               _selectedCircle = _circles.first;
             }
-          });
-        }
+          }
+
+          _loadingOperators = false;
+          _loadingCircles = false;
+        });
       }
     } catch (_) {
-      // Non-blocking fallback to instant pre-seeded operators
+      if (mounted) {
+        setState(() {
+          _loadingOperators = false;
+          _loadingCircles = false;
+        });
+      }
     }
   }
 
@@ -129,15 +104,23 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
 
   void _onMobileChanged(String value) {
     String clean = value.replaceAll('+91 ', '').replaceAll(' ', '').trim();
-    if (clean.length == 10) {
-      // Auto-detect circle/operator hints based on starting digits
+    if (clean.length == 10 && _operators.isNotEmpty) {
       final prefix = clean.substring(0, 2);
-      if (['98', '99', '94'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Airtel Prepaid');
-      } else if (['63', '70', '79', '89'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Jio Prepaid');
-      } else if (['90', '91', '97'].contains(prefix)) {
-        setState(() => _selectedOperator = 'Vi (Vodafone Idea)');
+      for (final op in _operators) {
+        final label = (op['label'] ?? '').toString().toLowerCase();
+        if (['98', '99', '94'].contains(prefix) && label.contains('airtel')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (['63', '70', '79', '89'].contains(prefix) && label.contains('jio')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (['90', '91', '97'].contains(prefix) && (label.contains('vi') || label.contains('vodafone'))) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        } else if (prefix == '94' && label.contains('bsnl')) {
+          setState(() => _selectedOperator = op['label']);
+          break;
+        }
       }
     }
   }
@@ -203,7 +186,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
         'mobile_number': _mobileCtrl.text.replaceAll('+91 ', '').trim(),
         'operator_id': opData['id'] ?? opData['label'],
         'operator_name': _selectedOperator,
-        'circle': _selectedCircle ?? 'Tamil Nadu',
+        'circle': _selectedCircle ?? '',
         'amount': _amountCtrl.text.trim(),
         'type': 'prepaid',
         'razorpay_payment_id': razorpayPaymentId,
@@ -277,40 +260,48 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            ..._operators.map((op) {
-              final isSel = op['label'] == _selectedOperator;
-              return ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: (op['color'] as Color? ?? primaryPurple).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    op['icon'] as IconData? ?? Icons.sim_card_rounded,
-                    color: op['color'] as Color? ?? primaryPurple,
-                    size: 20,
-                  ),
+            if (_operators.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text('No operators found in database.', style: TextStyle(color: textSubdued)),
                 ),
-                title: Text(
-                  op['label'] ?? '',
-                  style: TextStyle(
-                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                    color: isSel ? primaryPurple : primaryDark,
+              )
+            else
+              ..._operators.map((op) {
+                final isSel = op['label'] == _selectedOperator;
+                return ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: primaryPurple.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.cell_tower_rounded,
+                      color: primaryPurple,
+                      size: 20,
+                    ),
                   ),
-                ),
-                trailing: isSel
-                    ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
-                    : null,
-                onTap: () {
-                  setState(() => _selectedOperator = op['label']);
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
+                  title: Text(
+                    op['label'] ?? '',
+                    style: TextStyle(
+                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                      color: isSel ? primaryPurple : primaryDark,
+                    ),
+                  ),
+                  trailing: isSel
+                      ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
+                      : null,
+                  onTap: () {
+                    setState(() => _selectedOperator = op['label']);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
             const SizedBox(height: 20),
           ],
         ),
@@ -347,39 +338,71 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _circles.length,
-                separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                itemBuilder: (ctx, idx) {
-                  final c = _circles[idx];
-                  final isSel = c == _selectedCircle;
-                  return ListTile(
-                    title: Text(
-                      c,
-                      style: TextStyle(
-                        fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                        color: isSel ? primaryPurple : primaryDark,
+            if (_circles.isEmpty)
+              const Expanded(
+                child: Center(
+                  child: Text('No circles found in database.', style: TextStyle(color: textSubdued)),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _circles.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  itemBuilder: (ctx, idx) {
+                    final c = _circles[idx];
+                    final isSel = c == _selectedCircle;
+                    return ListTile(
+                      title: Text(
+                        c,
+                        style: TextStyle(
+                          fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
+                          color: isSel ? primaryPurple : primaryDark,
+                        ),
                       ),
-                    ),
-                    trailing: isSel
-                        ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
-                        : null,
-                    onTap: () {
-                      setState(() => _selectedCircle = c);
-                      Navigator.pop(ctx);
-                    },
-                  );
-                },
+                      trailing: isSel
+                          ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
+                          : null,
+                      onTap: () {
+                        setState(() => _selectedCircle = c);
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
   }
 
-  void _showBrowsePlans() {
+  Future<void> _showBrowsePlans() async {
+    final opData = _operators.firstWhere(
+      (o) => o['label'] == _selectedOperator,
+      orElse: () => {'code': _selectedOperator ?? '', 'id': _selectedOperator ?? ''},
+    );
+    final opCode = opData['code'] ?? opData['id'] ?? '';
+    final circle = _selectedCircle ?? '';
+
+    setState(() => _loadingPlans = true);
+
+    try {
+      final res = await _api.getRechargePlans(opCode, circle);
+      if (mounted && res['success'] == true && res['plans'] != null) {
+        setState(() {
+          _livePlans = List<Map<String, dynamic>>.from(res['plans']);
+          _loadingPlans = false;
+        });
+      } else {
+        setState(() => _loadingPlans = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPlans = false);
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -418,96 +441,114 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
             ),
             const SizedBox(height: 14),
             Expanded(
-              child: ListView.builder(
-                itemCount: _popularPlans.length,
-                itemBuilder: (ctx, idx) {
-                  final p = _popularPlans[idx];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+              child: _loadingPlans
+                  ? const Center(child: CircularProgressIndicator(color: primaryPurple))
+                  : _livePlans.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No plans available from database for selected operator.',
+                            style: TextStyle(color: textSubdued, fontSize: 13.5),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _livePlans.length,
+                          itemBuilder: (ctx, idx) {
+                            final p = _livePlans[idx];
+                            final amt = p['amount']?.toString() ?? '0';
+                            final validity = p['validity']?.toString() ?? 'Active';
+                            final data = p['data']?.toString() ?? '';
+                            final desc = p['description']?.toString() ?? p['desc']?.toString() ?? '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    '₹${p["amount"]}',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w900,
-                                      color: primaryDark,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              '₹$amt',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w900,
+                                                color: primaryDark,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEDE9FE),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                validity,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: primaryPurple,
+                                                ),
+                                              ),
+                                            ),
+                                            if (data.isNotEmpty) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE0F2FE),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  data,
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF0284C7),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        if (desc.isNotEmpty) ...[
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            desc,
+                                            style: const TextStyle(fontSize: 12.5, color: textSubdued, height: 1.3),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEDE9FE),
-                                      borderRadius: BorderRadius.circular(6),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      setState(() => _amountCtrl.text = amt);
+                                      Navigator.pop(ctx);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryPurple,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
                                     ),
-                                    child: Text(
-                                      p['validity'],
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: primaryPurple,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFE0F2FE),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      p['data'],
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF0284C7),
-                                      ),
-                                    ),
+                                    child: const Text('Select', style: TextStyle(fontWeight: FontWeight.w700)),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              Text(
-                                p['desc'],
-                                style: const TextStyle(fontSize: 12.5, color: textSubdued, height: 1.3),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() => _amountCtrl.text = p['amount']);
-                            Navigator.pop(ctx);
+                            );
                           },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryPurple,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            elevation: 0,
-                          ),
-                          child: const Text('Select', style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
-                      ],
-                    ),
-                  );
-                },
-              ),
             ),
           ],
         ),
@@ -614,7 +655,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Instant recharge with all operators & live plans',
+                  'Instant recharge with live database operators & plans',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
@@ -745,7 +786,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
             ),
             const SizedBox(height: 18),
 
-            // 2. Operator Selector
+            // 2. Operator Selector (Database Loaded)
             const Text(
               'Operator',
               style: TextStyle(
@@ -756,7 +797,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _showOperatorPicker,
+              onTap: _loadingOperators ? null : _showOperatorPicker,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -771,22 +812,31 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _selectedOperator ?? 'Select operator',
-                        style: const TextStyle(
+                        _loadingOperators
+                            ? 'Loading operators from database...'
+                            : (_selectedOperator ?? 'Select operator'),
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: primaryDark,
+                          color: _selectedOperator != null ? primaryDark : textSubdued,
                         ),
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
+                    if (_loadingOperators)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                      )
+                    else
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 18),
 
-            // 3. Circle Selector
+            // 3. Circle Selector (Database Loaded)
             const Text(
               'Circle / Region',
               style: TextStyle(
@@ -797,7 +847,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _showCirclePicker,
+              onTap: _loadingCircles ? null : _showCirclePicker,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -812,15 +862,24 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _selectedCircle ?? 'Select circle',
-                        style: const TextStyle(
+                        _loadingCircles
+                            ? 'Loading circles from database...'
+                            : (_selectedCircle ?? 'Select circle'),
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
-                          color: primaryDark,
+                          color: _selectedCircle != null ? primaryDark : textSubdued,
                         ),
                       ),
                     ),
-                    const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
+                    if (_loadingCircles)
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                      )
+                    else
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
                   ],
                 ),
               ),
@@ -843,13 +902,20 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   onTap: _showBrowsePlans,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      'Browse Plans',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: primaryPurple,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.list_alt_rounded, size: 14, color: primaryPurple),
+                        SizedBox(width: 4),
+                        Text(
+                          'Browse Plans',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: primaryPurple,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -877,7 +943,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: primaryPurple),
                   ),
                 ),
-                hintText: 'Enter plan amount (e.g. 299)',
+                hintText: 'Enter plan amount',
                 hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
@@ -894,40 +960,6 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: primaryPurple, width: 1.8),
                 ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Quick plan chips
-            SizedBox(
-              height: 34,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: ['₹239', '₹299', '₹349', '₹666', '₹839', '₹2999'].map((amt) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () => setState(() => _amountCtrl.text = amt.replaceAll('₹', '')),
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Text(
-                          amt,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF334155),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
               ),
             ),
             const SizedBox(height: 28),
