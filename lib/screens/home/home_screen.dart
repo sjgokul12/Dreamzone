@@ -1101,30 +1101,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 38),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ─── Top Bar: Left Drawer, Center DZI Infinity Logo & Pro, Right Bell ───
+                // ─── Top Bar: Left Drawer (Glass) & Right Bell (Glass) ─────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 1. Left Side: Hamburger Drawer Menu Button
+                    // 1. Left Side: Hamburger Drawer Menu Button (Glass/Mirror Design)
                     InkWell(
                       onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Colors.white.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            width: 1.5,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                              color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -1136,107 +1140,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
 
-                    // 2. Middle: Gradient DZI Infinity Logo + DZI Infinity Text + PRO ACCOUNT
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // DZI Circular Gradient Logo
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFFEC4899)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Text(
-                                'DZI',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                  height: 1.0,
-                                ),
-                              ),
-                              SizedBox(height: 1),
-                              Text(
-                                '∞',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  height: 0.9,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'DZI Infinity',
-                              style: TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.3,
-                                height: 1.1,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEDE9FE),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                'PRO ACCOUNT',
-                                style: TextStyle(
-                                  color: Color(0xFF7C3AED),
-                                  fontSize: 8.5,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    // 3. Far Right: Notification Bell Icon
+                    // 2. Far Right: Notification Bell Icon (Glass/Mirror Design)
                     InkWell(
                       onTap: () => _navigateWithAnimation(const NotificationsScreen()),
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
-                        width: 40,
-                        height: 40,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Colors.white.withValues(alpha: 0.8),
                           borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            width: 1.5,
+                          ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                              color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
@@ -1247,11 +1169,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const Icon(
                               Icons.notifications_none_rounded,
                               color: Color(0xFF0F172A),
-                              size: 20,
+                              size: 21,
                             ),
                             Positioned(
-                              right: 6,
-                              top: 6,
+                              right: 7,
+                              top: 7,
                               child: Container(
                                 padding: const EdgeInsets.all(3),
                                 decoration: const BoxDecoration(
@@ -1285,9 +1207,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
 
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
 
-                // ─── Welcome Badge (Exact Reference Styling) ────────────────
+                // ─── Welcome Badge ──────────────────────────────────────────
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                   decoration: BoxDecoration(
@@ -1322,7 +1244,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 const SizedBox(height: 8),
 
-                // ─── Main Hero Heading (Exact Screenshot Typography) ───────────
+                // ─── Main Hero Heading ───────────────────────────────────────
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
@@ -1334,7 +1256,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           const Text(
                             "Let's explore",
                             style: TextStyle(
-                              fontSize: 23,
+                              fontSize: 24,
                               fontWeight: FontWeight.w900,
                               color: Color(0xFF0F172A),
                               letterSpacing: -0.5,
@@ -1356,7 +1278,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 child: const Text(
                                   "DZI Infinity ",
                                   style: TextStyle(
-                                    fontSize: 23,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.w900,
                                     color: Colors.white,
                                     letterSpacing: -0.5,
@@ -1384,7 +1306,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 child: const Text(
                                   "PRO",
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w900,
                                     color: Colors.white,
                                     letterSpacing: 0.5,
@@ -1400,15 +1322,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ],
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
-                // ─── Status Chips ──────────────────────────────────────────
-                Row(
+                // ─── Status Chips (Line by Line) ────────────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Line 1: All Systems Online
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Colors.white.withValues(alpha: 0.9),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                         boxShadow: [
@@ -1433,11 +1357,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 5),
+                          const SizedBox(width: 6),
                           const Text(
                             'All systems online',
                             style: TextStyle(
-                              fontSize: 10.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF334155),
                             ),
@@ -1445,17 +1369,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+
+                    const SizedBox(height: 6),
+
+                    // Line 2: Instant Service
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 8,
+                            blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
                         ],
@@ -1463,8 +1390,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Text('⚡', style: TextStyle(fontSize: 11)),
-                          SizedBox(width: 5),
+                          Icon(Icons.bolt_rounded, color: Color(0xFFF59E0B), size: 14),
+                          SizedBox(width: 4),
                           Text(
                             'Instant service',
                             style: TextStyle(
