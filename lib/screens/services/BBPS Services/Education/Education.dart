@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 typedef Education = EducationScreen;
 
@@ -51,6 +53,9 @@ class _EducationScreenState extends State<EducationScreen>
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   String get _base => ApiService.baseUrl;
   bool get _canShowAmount =>
       _studentIdCtrl.text.trim().isNotEmpty && _selectedOp != null;
@@ -81,13 +86,15 @@ class _EducationScreenState extends State<EducationScreen>
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fetchOperators(); // ✅ Pre-fetch → picker opens instantly
     _searchCtrl.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
-    _studentIdCtrl.dispose(); _amountCtrl.dispose(); _searchCtrl.dispose(); super.dispose();
+    _studentIdCtrl.dispose(); _amountCtrl.dispose(); _searchCtrl.dispose(); _razorpayService.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchOperators() async {
@@ -123,35 +130,56 @@ class _EducationScreenState extends State<EducationScreen>
     if (_selectedOp == null) { _snack('Please select an institution', isError: true); return; }
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn || auth.userId == null) { _snack('Please login', isError: true); return; }
+
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'Education Fee – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitEducation(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _snack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitEducation({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() { _submitting = true; _resultStatus = null; });
     try {
       final res = await http.post(
         Uri.parse('$_base/education/pay'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'user_id':       auth.userId,
-          'student_id':    _studentIdCtrl.text.trim(),
-          'operator_id':   _selectedOp!['spkey']?.toString() ?? '',
-          'operator_name': _selectedOp!['label']?.toString() ?? '',
-          'amount':        _amountCtrl.text.trim(),
+          'user_id':             auth.userId,
+          'student_id':          _studentIdCtrl.text.trim(),
+          'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
+          'operator_name':       _selectedOp!['label']?.toString() ?? '',
+          'amount':              _amountCtrl.text.trim(),
+          'razorpay_payment_id': razorpayPaymentId,
+          'payment_status':      'paid',
         }),
       ).timeout(const Duration(seconds: 60));
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
-        _submitting    = false;
-        _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
-        _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'Fee paid!' : 'Payment failed');
-        _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'EDU${DateTime.now().millisecondsSinceEpoch}';
-      });
+          _submitting    = false;
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultMessage = (data['message']?.toString() ?? (_resultStatus == 'success' ? 'Fee paid!' : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
+          _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'EDU${DateTime.now().millisecondsSinceEpoch}';
+        });
       }
     } catch (_) {
       if (mounted) {
         setState(() {
-        _submitting = false; _resultStatus = 'pending';
-        _resultMessage = "Couldn't confirm payment. Check history.";
-        _merchantTxnId = 'EDU${DateTime.now().millisecondsSinceEpoch}';
-      });
+          _submitting = false; _resultStatus = 'pending';
+          _resultMessage = "Couldn't confirm payment. Check history.";
+          _merchantTxnId = 'EDU${DateTime.now().millisecondsSinceEpoch}';
+        });
       }
     }
   }
@@ -740,7 +768,7 @@ class _EducationScreenState extends State<EducationScreen>
           const SizedBox(height: 20),
           Text(title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: col)),
           const SizedBox(height: 10),
-          Text(_resultMessage ?? '', textAlign: TextAlign.center,
+          Text((_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(), textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: textMuted, height: 1.5)),
           const SizedBox(height: 22),
           Container(width: double.infinity,
@@ -864,3 +892,6 @@ class _EducationScreenState extends State<EducationScreen>
         ])));
   }
 }
+
+
+

@@ -3,9 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:dreamzoneapp/providers/auth_provider.dart';
 import 'package:dreamzoneapp/services/api_service.dart';
-const Color primaryPurple = Color(0xFF8B5CF6);
+import 'package:dreamzoneapp/core/payment/razorpay_service.dart';
+
+// Premium Palette Theme Constants (Shared Globally in this file)
+const Color primaryPurple      = Color(0xFF5F33E1);
+const Color secondaryPurple    = Color(0xFF7C3AED);
+const Color textDarkHeading    = Color(0xFF1E1B4B);
+const Color textLabelDark      = Color(0xFF312E81);
+const Color textSubdued        = Color(0xFF6B7280);
+const Color bgCanvas           = Color(0xFFF5F3FF);
+const Color cardSurface        = Colors.white;
 
 class GstServiceScreen extends StatefulWidget {
   final Map<String, dynamic> service;
@@ -29,6 +39,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final ApiService _api = ApiService();
+  final RazorpayService _razorpayService = RazorpayService();
   bool _submitted = false;
   bool _loading = false;
   String? _trackingId;
@@ -64,30 +75,19 @@ class _GstServiceScreenState extends State<GstServiceScreen>
 
   // 4 Upload Documents Bytes
   final Map<String, List<Map<String, dynamic>>> _uploadedDocs = {};
-  final bool _unlockedDocuments = false;
 
   Map<String, dynamic>? _savedDetails;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  int _expandedSectionIndex = 0; // Tracks currently active step index
 
   String get _base => ApiService.baseUrl;
-
-  // Premium Palette
-  static const Color primaryTeal        = Color(0xFF00A896);
-  static const Color secondaryTeal      = Color(0xFF0284C7);
-  static const Color headerGradientStart= Color(0xFF0F766E);
-  static const Color headerGradientEnd  = Color(0xFF0284C7);
-  static const Color textDarkHeading    = Color(0xFF0F172A);
-  static const Color textLabelDark      = Color(0xFF1E293B);
-  static const Color textSubdued        = Color(0xFF64748B);
-  static const Color bgCanvas           = Color(0xFFF1F5F9);
-  static const Color cardSurface        = Colors.white;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 650),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(
@@ -96,12 +96,14 @@ class _GstServiceScreenState extends State<GstServiceScreen>
     );
     _animationController.forward();
 
-    _fetchDropdownOptions(); // ✅ Dynamic API fetch for States, Categories & Account Types
+    _fetchDropdownOptions();
     _loadSavedUserData();
+    _razorpayService.init();
   }
 
   @override
   void dispose() {
+    _razorpayService.dispose();
     _animationController.dispose();
     _applicantNameController.dispose();
     _applicantFatherController.dispose();
@@ -179,22 +181,22 @@ class _GstServiceScreenState extends State<GstServiceScreen>
       if (res['success'] == true && res['details'] != null && mounted) {
         setState(() {
           _savedDetails = res['details'];
-          if (_savedDetails!['full_name'] != null) {
+          if (_applicantNameController.text.isEmpty && _savedDetails!['full_name'] != null) {
             _applicantNameController.text = _savedDetails!['full_name'];
           }
-          if (_savedDetails!['father_name'] != null) {
+          if (_applicantFatherController.text.isEmpty && _savedDetails!['father_name'] != null) {
             _applicantFatherController.text = _savedDetails!['father_name'];
           }
-          if (_savedDetails!['mobile'] != null) {
+          if (_mobileNumberController.text.isEmpty && _savedDetails!['mobile'] != null) {
             _mobileNumberController.text = _savedDetails!['mobile'];
           }
-          if (_savedDetails!['email'] != null) {
+          if (_emailIdController.text.isEmpty && _savedDetails!['email'] != null) {
             _emailIdController.text = _savedDetails!['email'];
           }
-          if (_savedDetails!['aadhaar_number'] != null) {
+          if (_aadhaarNoController.text.isEmpty && _savedDetails!['aadhaar_number'] != null) {
             _aadhaarNoController.text = _savedDetails!['aadhaar_number'];
           }
-          if (_savedDetails!['pan_number'] != null) {
+          if (_panNoController.text.isEmpty && _savedDetails!['pan_number'] != null) {
             _panNoController.text = _savedDetails!['pan_number'];
           }
         });
@@ -202,34 +204,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
     } catch (_) {}
   }
 
-  void _applySavedDetails() {
-    if (_savedDetails == null) return;
-    setState(() {
-      _applicantNameController.text   = _savedDetails!['full_name'] ?? _applicantNameController.text;
-      _applicantFatherController.text = _savedDetails!['father_name'] ?? _applicantFatherController.text;
-      _mobileNumberController.text    = _savedDetails!['mobile'] ?? _mobileNumberController.text;
-      _emailIdController.text         = _savedDetails!['email'] ?? _emailIdController.text;
-      _aadhaarNoController.text       = _savedDetails!['aadhaar_number'] ?? _aadhaarNoController.text;
-      _panNoController.text           = _savedDetails!['pan_number'] ?? _panNoController.text;
-      _applicantAddressController.text= _savedDetails!['address_line1'] ?? _applicantAddressController.text;
-      _businessAddressController.text = _savedDetails!['address_line2'] ?? _businessAddressController.text;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(children: [
-          Icon(Icons.check_circle, color: Colors.white, size: 18),
-          SizedBox(width: 8),
-          Text('✨ Saved profile details applied!', style: TextStyle(fontWeight: FontWeight.w600)),
-        ]),
-        backgroundColor: primaryTeal,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-
-  double get _payableAmount => 500.00;
+  double get _payableAmount => 699.00;
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '0 KB';
@@ -282,7 +257,19 @@ class _GstServiceScreenState extends State<GstServiceScreen>
   }
 
   Future<void> _submitGstForm() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      setState(() {
+        _expandedSectionIndex = 0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('⚠️ Please fill all required fields correctly'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn) {
@@ -290,27 +277,54 @@ class _GstServiceScreenState extends State<GstServiceScreen>
       return;
     }
 
+    // Open Razorpay first; backend called only on payment success
+    _razorpayService.openPaymentGateway(
+      amount: _payableAmount,
+      description: 'GST Registration',
+      name: 'DZI Infinity',
+      contact: _mobileNumberController.text.trim(),
+      email: _emailIdController.text.trim(),
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitGstForm(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Payment failed: ${response.message ?? "Unknown error"}'),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitGstForm({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() => _loading = true);
 
     Map<String, String> formData = {
-      'service_type':          'GST Registration',
-      'applicant_category':   _applicantCategory ?? '',
-      'applicant_name':       _applicantNameController.text.trim(),
-      'applicant_father':     _applicantFatherController.text.trim(),
-      'applicant_address':    _applicantAddressController.text.trim(),
-      'aadhaar_no':           _aadhaarNoController.text.trim(),
-      'pan_no':               _panNoController.text.trim(),
-      'date_of_establishment':_dobEstablishmentController.text.trim(),
-      'business_address':     _businessAddressController.text.trim(),
-      'service_product':      _serviceProductController.text.trim(),
-      'mobile_number':        _mobileNumberController.text.trim(),
-      'email_id':             _emailIdController.text.trim(),
-      'delivery_state':       _deliveryState ?? '',
-      'bank_name':            _bankNameController.text.trim(),
-      'account_no':           _accountNoController.text.trim(),
-      'ifsc_code':            _ifscCodeController.text.trim(),
-      'account_type':         _accountType ?? '',
-      'amount':               _payableAmount.toStringAsFixed(2),
+      'service_type':           'GST Registration',
+      'applicant_category':     _applicantCategory ?? '',
+      'applicant_name':         _applicantNameController.text.trim(),
+      'applicant_father':       _applicantFatherController.text.trim(),
+      'applicant_address':      _applicantAddressController.text.trim(),
+      'aadhaar_no':             _aadhaarNoController.text.trim(),
+      'pan_no':                 _panNoController.text.trim(),
+      'date_of_establishment':  _dobEstablishmentController.text.trim(),
+      'business_address':       _businessAddressController.text.trim(),
+      'service_product':        _serviceProductController.text.trim(),
+      'mobile_number':          _mobileNumberController.text.trim(),
+      'email_id':               _emailIdController.text.trim(),
+      'delivery_state':         _deliveryState ?? '',
+      'bank_name':              _bankNameController.text.trim(),
+      'account_no':             _accountNoController.text.trim(),
+      'ifsc_code':              _ifscCodeController.text.trim(),
+      'account_type':           _accountType ?? '',
+      'amount':                 _payableAmount.toStringAsFixed(2),
+      'razorpay_payment_id':    razorpayPaymentId,
+      'payment_status':         'paid',
     };
 
     try {
@@ -318,10 +332,10 @@ class _GstServiceScreenState extends State<GstServiceScreen>
         'POST',
         Uri.parse('$_base/gst/apply'),
       );
-      request.fields['user_id']   = auth.userId.toString();
-      request.fields['service_id']= widget.service['id']?.toString() ?? '300';
-      request.fields['form_id']   = widget.preselectedSectionId?.toString() ?? '301';
-      request.fields['form_data'] = jsonEncode(formData);
+      request.fields['user_id']    = auth.userId.toString();
+      request.fields['service_id'] = widget.service['id']?.toString() ?? '300';
+      request.fields['form_id']    = widget.preselectedSectionId?.toString() ?? '301';
+      request.fields['form_data']  = jsonEncode(formData);
 
       for (var entry in formData.entries) {
         request.fields[entry.key] = entry.value;
@@ -349,7 +363,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
         setState(() {
           _loading   = false;
           _submitted = true;
-          _trackingId= data['tracking_id'] ??
+          _trackingId = data['tracking_id'] ??
               'TRK-GST-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
         });
       }
@@ -358,7 +372,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
         setState(() {
           _loading   = false;
           _submitted = true;
-          _trackingId= 'TRK-GST-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
+          _trackingId = 'TRK-GST-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
         });
       }
     }
@@ -384,756 +398,477 @@ class _GstServiceScreenState extends State<GstServiceScreen>
     final isDesktop  = screenSize.width > 900;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF3E8FF), Color(0xFFF8FAFC)],
-          ),
-        ),
-        child: SafeArea(
-          child: _submitted ? _buildSuccessView() : _buildFormBody(isDesktop, screenSize),
-        ),
+      backgroundColor: bgCanvas,
+      body: _submitted ? _buildSuccessView() : _buildFormBody(isDesktop, screenSize),
+    );
+  }
+
+  Widget _buildTopNavBar() {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 8,
       ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.arrow_back, color: primaryPurple, size: 20),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE6F4EA),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.teal.withValues(alpha: 0.2)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_user_rounded, color: Colors.teal, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Secure & Trusted',
+                  style: TextStyle(
+                    color: Colors.teal,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardHeight = constraints.maxWidth / 1.6;
+        return Container(
+          width: double.infinity,
+          height: cardHeight,
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Image.asset(
+              'assets/GST top.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: const Color(0xFFF3F0FF),
+                  child: const Center(
+                    child: Icon(Icons.business_center_outlined, size: 70, color: primaryPurple),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildFormBody(bool isDesktop, Size screenSize) {
     double horizontalPadding = screenSize.width > 1100
         ? (screenSize.width - 940) / 2
-        : (screenSize.width > 700 ? 24.0 : 12.0);
+        : (screenSize.width > 700 ? 24.0 : 16.0);
+
+    // Dynamic sticky bottom button labels
+    String buttonTitle = "Next: Contact Info";
+    String buttonSubtitle = "Save and continue";
+    IconData buttonIcon = Icons.call_outlined;
+
+    const totalSteps = 5;
+
+    if (_expandedSectionIndex == 0) {
+      buttonTitle = "Next: Contact Info";
+      buttonIcon = Icons.call_outlined;
+    } else if (_expandedSectionIndex == 1) {
+      buttonTitle = "Next: Bank Account";
+      buttonIcon = Icons.account_balance_outlined;
+    } else if (_expandedSectionIndex == 2) {
+      buttonTitle = "Next: Upload Documents";
+      buttonIcon = Icons.cloud_upload_outlined;
+    } else if (_expandedSectionIndex == 3) {
+      buttonTitle = "Next: Payment Details";
+      buttonIcon = Icons.payment_outlined;
+    } else if (_expandedSectionIndex == 4) {
+      buttonTitle = "Submit GST Form";
+      buttonSubtitle = "Proceed to secure application submission";
+      buttonIcon = Icons.check_circle_outline;
+    }
 
     return FadeTransition(
       opacity: _fadeAnimation,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 18.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHero(),
-              const SizedBox(height: 24),
-              if (_savedDetails != null) ...[
-
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    onPressed: _applySavedDetails,
-                    icon: const Icon(Icons.bolt, color: Colors.white, size: 16),
-                    label: const Text(
-                      'Auto-Fill Saved Profile',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryTeal,
-                      elevation: 1,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
-
-              // Main Surface Card
-              Container(
-                decoration: BoxDecoration(
-                  color: cardSurface,
-                  borderRadius: BorderRadius.circular(22),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
+      child: Column(
+        children: [
+          _buildTopNavBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+              child: Form(
+                key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // SECTION 1: Personal Information
-                    _buildHeaderBanner('1 Personal Information', subtitle: 'Please provide your personal details'),
-                    Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildResponsiveRow(
-                            context,
-                            _buildDropdownField(
-                              'Applicant Category *',
-                              _applicantCategory,
-                              _applicantCategories.isNotEmpty
-                                  ? _applicantCategories
-                                  : ['Proprietor', 'Partnership'],
-                              (v) => setState(() => _applicantCategory = v),
-                              hint: 'Select Category',
-                            ),
-                            _buildInput('Applicant Name *', _applicantNameController, placeholder: 'APPLICANT NAME'),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildInput('Applicant Father *', _applicantFatherController, placeholder: 'FATHER NAME'),
-                          const SizedBox(height: 14),
-                          _buildResponsiveRow(
-                            context,
-                            _buildInput('Applicant Address *', _applicantAddressController, placeholder: 'APPLICANT ADDRESS'),
-                            _buildInput('Aadhaar No *', _aadhaarNoController, isNum: true, placeholder: 'AADHAAR NO'),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildResponsiveRow(
-                            context,
-                            _buildInput('PAN No. *', _panNoController, placeholder: 'PAN NO.'),
-                            _buildDateField('Date of Establishment *', _dobEstablishmentController),
-                          ),
-                          const SizedBox(height: 14),
-                          _buildResponsiveRow(
-                            context,
-                            _buildInput('Business Address *', _businessAddressController, placeholder: 'BUSINESS ADDRESS'),
-                            _buildInput('Service/Product *', _serviceProductController, placeholder: 'SERVICE / PRODUCT'),
-                          ),
-                        ],
-                      ),
+                    _buildHero(),
+
+                    // Expandable Accordion Stepper Cards
+                    _buildAccordionSection(
+                      index: 0,
+                      title: '1. Personal Information',
+                      subtitle: 'Owner details, DOB, Aadhaar & PAN details',
+                      leadingIcon: Icons.person_outline,
+                      child: _buildPersonalInfoStep(),
                     ),
-
-                    // SECTION 2: Contact Information (Dynamic API State Dropdown)
-                    _buildHeaderBanner('2 Contact Information', subtitle: 'Where can we reach you?'),
-                    Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          bool isWide = constraints.maxWidth > 700;
-                          final stateList = _deliveryStates.isNotEmpty
-                              ? _deliveryStates
-                              : [
-                                  "Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli","Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Pondicherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"
-                                ];
-                          return isWide
-                              ? Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER')),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID')),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _statesLoading
-                                          ? const Padding(
-                                              padding: EdgeInsets.only(top: 24),
-                                              child: Row(children: [
-                                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryTeal)),
-                                                SizedBox(width: 8),
-                                                Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
-                                              ]),
-                                            )
-                                          : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State'),
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER'),
-                                    const SizedBox(height: 12),
-                                    _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID'),
-                                    const SizedBox(height: 12),
-                                    _statesLoading
-                                        ? const Padding(
-                                            padding: EdgeInsets.symmetric(vertical: 8),
-                                            child: Row(children: [
-                                              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryTeal)),
-                                              SizedBox(width: 8),
-                                              Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
-                                            ]),
-                                          )
-                                        : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State'),
-                                  ],
-                                );
-                        },
-                      ),
+                    _buildAccordionSection(
+                      index: 1,
+                      title: '2. Contact Information',
+                      subtitle: 'Mobile, email and state delivery details',
+                      leadingIcon: Icons.contact_mail_outlined,
+                      child: _buildContactInfoStep(),
                     ),
-
-                    // SECTION 3: Account Information
-                    _buildHeaderBanner('3 Account Information', subtitle: 'Your banking details'),
-                    Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          bool isWide = constraints.maxWidth > 750;
-                          final accTypes = _accountTypes.isNotEmpty
-                              ? _accountTypes
-                              : ['Savings A/c', 'Current A/c'];
-                          return isWide
-                              ? Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(child: _buildInput('Bank Name', _bankNameController, placeholder: 'BANK NAME')),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account No.')),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC CODE')),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Account Type'),
-                                    ),
-                                  ],
-                                )
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildInput('Bank Name', _bankNameController, placeholder: 'BANK NAME'),
-                                    const SizedBox(height: 12),
-                                    _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account No.'),
-                                    const SizedBox(height: 12),
-                                    _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC CODE'),
-                                    const SizedBox(height: 12),
-                                    _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Account Type'),
-                                  ],
-                                );
-                        },
-                      ),
+                    _buildAccordionSection(
+                      index: 2,
+                      title: '3. Account Information',
+                      subtitle: 'Bank accounts and IFSC code details',
+                      leadingIcon: Icons.account_balance_outlined,
+                      child: _buildAccountInfoStep(),
                     ),
-
-                    // SECTION 4: Upload Document (Matching Screenshot 2 UI)
-                    _buildHeaderBanner('4 Upload Documents', subtitle: 'Upload all required documents'),
-                    Padding(
-                      padding: const EdgeInsets.all(18.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: cardSurface,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Upload Files',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textDarkHeading),
-                            ),
-                            const SizedBox(height: 14),
-
-                            // Top Drop Zone Box matching Screenshot 2
-                            InkWell(
-                              onTap: () {
-                                final requiredKeys = ['doc_cheque', 'doc_aadhaar', 'doc_pan', 'doc_photo', 'doc_rental', 'doc_electricity'];
-                                final firstEmpty = requiredKeys.firstWhere((k) => !_uploadedDocs.containsKey(k), orElse: () => 'doc_cheque');
-                                _pickFile(firstEmpty);
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: primaryPurple.withValues(alpha: 0.3), width: 1.5, style: BorderStyle.solid),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Container(
-                                      width: 64,
-                                      height: 64,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: [Color(0xFFB06AB3), Color(0xFF4568DC)],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                      ),
-                                      child: const Icon(Icons.cloud_upload_outlined, size: 32, color: Colors.white),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const Text.rich(
-                                      TextSpan(
-                                        text: 'Drag & Drop files here\n',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textDarkHeading, height: 1.5),
-                                        children: [
-                                          TextSpan(text: 'or ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: textSubdued)),
-                                          TextSpan(text: 'browse', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: primaryPurple)),
-                                          TextSpan(text: ' from your device', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: textSubdued)),
-                                        ]
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    const Text(
-                                      'PDF, PNG, JPG up to 5MB each',
-                                      style: TextStyle(fontSize: 12, color: textSubdued, fontWeight: FontWeight.w500),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-
-                            // Uploaded / Required Document Cards matching Screenshot 2
-                            _buildDocUploadCard('Cancel Cheque /Bank Statement *', 'doc_cheque'),
-                            _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-                            _buildDocUploadCard('PAN Card *', 'doc_pan'),
-                            _buildDocUploadCard('Applicant Photo *', 'doc_photo'),
-                            _buildDocUploadCard('Rental Agreement(English Version) *', 'doc_rental'),
-                            _buildDocUploadCard('Electricity Bill (Updated) *', 'doc_electricity'),
-                          ],
-                        ),
-                      ),
+                    _buildAccordionSection(
+                      index: 3,
+                      title: '4. Upload Required Documents',
+                      subtitle: 'Identity proofs and rental agreement proofs',
+                      leadingIcon: Icons.cloud_upload_outlined,
+                      child: _buildDocumentsStep(),
                     ),
-
-
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFB06AB3), Color(0xFF4568DC)],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _loading ? null : _submitGstForm,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                          ),
-                          child: _loading
-                              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      'Submit Application',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Icon(Icons.arrow_forward, color: Colors.white, size: 20),
-                                  ],
-                                ),
-                        ),
-                      ),
+                    _buildAccordionSection(
+                      index: 4,
+                      title: '5. Payment Details',
+                      subtitle: 'Application processing fee and check out details',
+                      leadingIcon: Icons.payment_outlined,
+                      child: _buildPaymentStep(),
                     ),
-                    const SizedBox(height: 16),
-                    const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.lock_outline, color: textSubdued, size: 14),
-                        SizedBox(width: 6),
-                        Text(
-                          'Your data is 100% secure and encrypted',
-                          style: TextStyle(color: textSubdued, fontSize: 12, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
-              const SizedBox(height: 44),
-            ],
+            ),
           ),
-        ),
+
+          // Sticky Bottom Gradient Action Bar
+          SafeArea(
+            top: false,
+            child: Container(
+              width: double.infinity,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [primaryPurple, secondaryPurple],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryPurple.withValues(alpha: 0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    if (_expandedSectionIndex < totalSteps - 1) {
+                      setState(() {
+                        _expandedSectionIndex++;
+                      });
+                    } else {
+                      _submitGstForm();
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(22),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(buttonIcon, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                buttonTitle,
+                                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                buttonSubtitle,
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                          child: const Icon(Icons.arrow_forward, color: primaryPurple, size: 18),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildResponsiveRow(BuildContext context, Widget left, Widget right) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        bool isWide = constraints.maxWidth > 550;
-        return isWide
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: left),
-                  const SizedBox(width: 12),
-                  Expanded(child: right),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  left,
-                  const SizedBox(height: 12),
-                  right,
-                ],
-              );
-      },
-    );
-  }
-
-  
-  Widget _buildHero() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 3,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF1E1B4B)),
-                onPressed: () => Navigator.pop(context),
-                padding: EdgeInsets.zero,
-                alignment: Alignment.centerLeft,
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'GST Registration',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontSize: 28,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Register your business\nin just a few simple steps',
-                style: TextStyle(
-                  color: Color(0xFF64748B),
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _buildFeaturePill(Icons.verified_user_rounded, 'Secure', '100% Safe'),
-                  const SizedBox(width: 10),
-                  _buildFeaturePill(Icons.bolt_rounded, 'Quick', 'Minutes'),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 0),
-        Expanded(
-          flex: 2,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: Image.asset(
-              'assets/GST top.png',
-              height: 180,
-              fit: BoxFit.contain,
-              errorBuilder: (ctx, error, stackTrace) => Image.asset('assets/GST image.png', height: 150, fit: BoxFit.contain, errorBuilder: (c,e,s) => const SizedBox(height: 150)),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeaturePill(IconData icon, String title, String subtitle) {
+  Widget _buildAccordionSection({
+    required int index,
+    required String title,
+    required String subtitle,
+    required IconData leadingIcon,
+    required Widget child,
+  }) {
+    final isExpanded = _expandedSectionIndex == index;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isExpanded ? primaryPurple.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+          width: isExpanded ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
+            color: isExpanded ? primaryPurple.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.01),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: const BoxDecoration(
-              color: Color(0xFF8B5CF6),
-              shape: BoxShape.circle,
+          ListTile(
+            onTap: () {
+              setState(() {
+                _expandedSectionIndex = isExpanded ? -1 : index;
+              });
+            },
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: isExpanded ? primaryPurple.withValues(alpha: 0.1) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                leadingIcon,
+                color: isExpanded ? primaryPurple : textSubdued,
+                size: 22,
+              ),
             ),
-            child: Icon(icon, color: Colors.white, size: 14),
+            title: Text(
+              title,
+              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: textDarkHeading),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: const TextStyle(fontSize: 11, color: textSubdued),
+            ),
+            trailing: Icon(
+              isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+              color: textSubdued,
+            ),
           ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1E1B4B))),
-              Text(subtitle, style: const TextStyle(fontSize: 9, color: Color(0xFF64748B))),
-            ],
-          ),
+          if (isExpanded) ...[
+            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: child,
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildHeaderBanner(String title, {String? subtitle}) {
-    final numStr = title.split(' ')[0].replaceAll('.', '');
-    final cleanTitle = title.replaceFirst(title.split(' ')[0], '').trim();
-    
+  Widget _buildPersonalInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildDropdownField('Applicant Category *', _applicantCategory, _applicantCategories, (v) => setState(() => _applicantCategory = v), prefixIcon: Icons.category_outlined, hint: 'Select Category'),
+        const SizedBox(height: 14),
+
+        _buildResponsiveRow(
+          context,
+          _buildInput('Applicant Full Name *', _applicantNameController, placeholder: 'Enter full name', prefixIcon: Icons.person_outline),
+          _buildInput('Father Full Name *', _applicantFatherController, placeholder: 'Enter father full name', prefixIcon: Icons.person_outline),
+        ),
+        const SizedBox(height: 14),
+
+        _buildInput('Residential Address *', _applicantAddressController, placeholder: 'Enter your residential address', prefixIcon: Icons.home_outlined),
+        const SizedBox(height: 14),
+
+        _buildResponsiveRow(
+          context,
+          _buildInput('Aadhaar Number *', _aadhaarNoController, isNum: true, placeholder: '12-digit Aadhaar No.', prefixIcon: Icons.badge_outlined),
+          _buildInput('PAN Number *', _panNoController, placeholder: '10-digit PAN No.', prefixIcon: Icons.credit_card_outlined),
+        ),
+        const SizedBox(height: 14),
+
+        _buildResponsiveRow(
+          context,
+          _buildDateField('Date of Birth / Establishment *', _dobEstablishmentController),
+          _buildInput('Business Address *', _businessAddressController, placeholder: 'Enter your business address', prefixIcon: Icons.business_center_outlined),
+        ),
+        const SizedBox(height: 14),
+
+        _buildInput('Service / Product Description *', _serviceProductController, placeholder: 'E.g., Retail Sales, Consulting Services', prefixIcon: Icons.work_outline),
+      ],
+    );
+  }
+
+  Widget _buildContactInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildResponsiveRow(
+          context,
+          _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: '10-digit mobile number', prefixIcon: Icons.phone_iphone_outlined),
+          _buildInput('Email ID *', _emailIdController, placeholder: 'E.g., info@yourdomain.com', prefixIcon: Icons.mail_outline),
+        ),
+        const SizedBox(height: 14),
+
+        _statesLoading
+            ? const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator(color: primaryPurple)))
+            : _buildDropdownField('Delivery State *', _deliveryState, _deliveryStates, (v) => setState(() => _deliveryState = v), prefixIcon: Icons.map_outlined, hint: 'Select State'),
+      ],
+    );
+  }
+
+  Widget _buildAccountInfoStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildResponsiveRow(
+          context,
+          _buildInput('Bank Name *', _bankNameController, placeholder: 'E.g., State Bank of India', prefixIcon: Icons.account_balance_outlined),
+          _buildInput('Bank Account Number *', _accountNoController, isNum: true, placeholder: 'Enter Account Number', prefixIcon: Icons.numbers_outlined),
+        ),
+        const SizedBox(height: 14),
+
+        _buildResponsiveRow(
+          context,
+          _buildInput('IFSC Code *', _ifscCodeController, placeholder: 'Enter 11-digit IFSC code', prefixIcon: Icons.code_rounded),
+          _buildDropdownField('Account Type *', _accountType, _accountTypes, (v) => setState(() => _accountType = v), prefixIcon: Icons.playlist_add_check_outlined, hint: 'Select Account Type'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocumentsStep() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFB06AB3), Color(0xFF4568DC)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(22),
-          topRight: Radius.circular(22),
-        ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              numStr,
-              style: const TextStyle(
-                color: Color(0xFF4568DC),
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
+          InkWell(
+            onTap: () {
+              final reqKeys = ['doc_cheque', 'doc_aadhaar', 'doc_pan', 'doc_photo', 'doc_rental', 'doc_electricity'];
+              final firstEmpty = reqKeys.firstWhere((k) => !_uploadedDocs.containsKey(k), orElse: () => reqKeys.first);
+              _pickFile(firstEmpty);
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: primaryPurple.withValues(alpha: 0.2), style: BorderStyle.solid),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.cloud_upload_outlined, size: 36, color: primaryPurple),
+                  SizedBox(height: 8),
+                  Text(
+                    'Browse files to upload',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'PDF, PNG, JPG up to 2MB',
+                    style: TextStyle(fontSize: 11, color: textSubdued),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  cleanTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12,
-                    ),
-                  ),
-                ]
-              ],
-            ),
-          ),
-          const Icon(Icons.keyboard_arrow_up, color: Colors.white),
+          const SizedBox(height: 18),
+
+          _buildDocUploadCard('Cancel Cheque /Bank Statement *', 'doc_cheque'),
+          _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
+          _buildDocUploadCard('PAN Card *', 'doc_pan'),
+          _buildDocUploadCard('Applicant Photo *', 'doc_photo'),
+          _buildDocUploadCard('Rental Agreement(English Version) *', 'doc_rental'),
+          _buildDocUploadCard('Electricity Bill (Updated) *', 'doc_electricity'),
         ],
       ),
-    );
-  }
-
-  IconData _getIconForLabel(String label) {
-    final l = label.toLowerCase();
-    if (l.contains('name') || l.contains('father')) return Icons.person_outline;
-    if (l.contains('address') || l.contains('state')) return Icons.location_on_outlined;
-    if (l.contains('aadhaar') || l.contains('pan')) return Icons.badge_outlined;
-    if (l.contains('date')) return Icons.calendar_today_outlined;
-    if (l.contains('business') || l.contains('product')) return Icons.storefront_outlined;
-    if (l.contains('mobile') || l.contains('email')) return Icons.contact_mail_outlined;
-    if (l.contains('bank') || l.contains('account') || l.contains('ifsc')) return Icons.account_balance_outlined;
-    if (l.contains('category')) return Icons.group_outlined;
-    return Icons.edit_outlined;
-  }
-
-  Widget _buildInput(String label, TextEditingController controller, {bool isNum = false, int? maxLength, String? placeholder, String? helper, IconData? prefixIcon}) {
-    final isReq = label.contains('*');
-    final cleanLabel = label.replaceAll('*', '').trim();
-    final icon = prefixIcon ?? _getIconForLabel(cleanLabel);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          margin: const EdgeInsets.only(top: 22),
-          decoration: BoxDecoration(
-            color: primaryPurple.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: primaryPurple, size: 24),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text.rich(
-                TextSpan(
-                  text: cleanLabel,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textLabelDark),
-                  children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: controller,
-                keyboardType: isNum ? TextInputType.number : TextInputType.text,
-                maxLength: maxLength,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
-                decoration: InputDecoration(
-                  hintText: placeholder ?? 'Enter $cleanLabel',
-                  helperText: helper,
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  counterText: maxLength != null ? 'Enter Only $maxLength Characters' : null,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  fillColor: Colors.white,
-                  filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: primaryPurple, width: 1.5)),
-                ),
-                validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDateField(String label, TextEditingController controller) {
-    return _buildDatePickerInput(label, controller);
-  }
-
-  Widget _buildDatePickerInput(String label, TextEditingController controller) {
-    final isReq = label.contains('*');
-    final cleanLabel = label.replaceAll('*', '').trim();
-    final icon = _getIconForLabel(cleanLabel);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          margin: const EdgeInsets.only(top: 22),
-          decoration: BoxDecoration(
-            color: primaryPurple.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: primaryPurple, size: 24),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text.rich(
-                TextSpan(
-                  text: cleanLabel,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textLabelDark),
-                  children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextFormField(
-                controller: controller,
-                readOnly: true,
-                onTap: () async {
-                  final DateTime? picked = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now().subtract(const Duration(days: 365 * 2)),
-                    firstDate: DateTime(1900),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) {
-                    final formatted = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-                    setState(() => controller.text = formatted);
-                  }
-                },
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
-                decoration: InputDecoration(
-                  hintText: 'Select date (YYYY-MM-DD)',
-                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                  suffixIcon: const Icon(Icons.calendar_today_outlined, size: 20, color: Color(0xFF64748B)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  fillColor: Colors.white,
-                  filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                ),
-                validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDropdownField(String label, String? value, List<String> items, ValueChanged<String?> onChanged, {String hint = 'Select Category'}) {
-    final isReq = label.contains('*');
-    final cleanLabel = label.replaceAll('*', '').trim();
-    final icon = _getIconForLabel(cleanLabel);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          margin: const EdgeInsets.only(top: 22),
-          decoration: BoxDecoration(
-            color: primaryPurple.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: primaryPurple, size: 24),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text.rich(
-                TextSpan(
-                  text: cleanLabel,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textLabelDark),
-                  children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
-                ),
-              ),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<String>(
-                initialValue: (value != null && items.contains(value)) ? value : null,
-                hint: Text(hint, style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
-                isExpanded: true,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
-                decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  fillColor: Colors.white,
-                  filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                ),
-                items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: onChanged,
-                validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
@@ -1153,7 +888,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: hasFile ? primaryPurple.withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -1170,11 +905,9 @@ class _GstServiceScreenState extends State<GstServiceScreen>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: docKey.contains('photo') ? const [Color(0xFF6366F1), Color(0xFF3B82F6)] : 
-                        docKey.contains('rental') ? const [Color(0xFFF59E0B), Color(0xFFD97706)] :
                         docKey.contains('aadhaar') ? const [Color(0xFFEF4444), Color(0xFFDC2626)] :
-                        docKey.contains('cheque') ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)] :
-                        docKey.contains('electricity') || docKey.contains('proof') ? const [Color(0xFF10B981), Color(0xFF059669)] :
-                        const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                        docKey.contains('pan') ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)] :
+                        const [Color(0xFF10B981), Color(0xFF059669)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1182,8 +915,8 @@ class _GstServiceScreenState extends State<GstServiceScreen>
             ),
             child: Icon(
               docKey.contains('photo') ? Icons.person : 
-              docKey.contains('rental') ? Icons.description :
-              Icons.credit_card, 
+              docKey.contains('aadhaar') ? Icons.credit_card :
+              Icons.assignment_outlined, 
               color: Colors.white, size: 24
             ),
           ),
@@ -1195,7 +928,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
                 Text.rich(
                   TextSpan(
                     text: hasFile ? fileName : cleanTitle,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDarkHeading),
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textDarkHeading),
                     children: (!hasFile && isReq) ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
                   ),
                   maxLines: 1,
@@ -1203,9 +936,9 @@ class _GstServiceScreenState extends State<GstServiceScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  hasFile ? 'Uploaded • ${_formatBytes(fileSize)}' : 'PDF, PNG, JPG up to 5MB',
+                  hasFile ? 'Uploaded • ${_formatBytes(fileSize)}' : 'PDF, PNG, JPG up to 2MB',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w500,
                     color: textSubdued,
                   ),
@@ -1241,6 +974,60 @@ class _GstServiceScreenState extends State<GstServiceScreen>
     );
   }
 
+  Widget _buildPaymentStep() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F3FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GST Registration',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Includes secure filing & processing',
+                      style: TextStyle(fontSize: 11, color: textSubdued),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '₹${_payableAmount.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: primaryPurple),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Icon(Icons.shield_outlined, color: Colors.green, size: 16),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Payments are secure and encrypted.',
+                style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   Widget _buildSuccessView() {
     return Center(
       child: Padding(
@@ -1265,10 +1052,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
               Container(
                 width: 72,
                 height: 72,
-                decoration: const BoxDecoration(
-                  color: primaryTeal,
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(color: primaryPurple, shape: BoxShape.circle),
                 child: const Icon(Icons.check, color: Colors.white, size: 42),
               ),
               const SizedBox(height: 20),
@@ -1286,8 +1070,9 @@ class _GstServiceScreenState extends State<GstServiceScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 decoration: BoxDecoration(
-                  color: primaryTeal.withValues(alpha: 0.1),
+                  color: const Color(0xFFF5F3FF),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children: [
@@ -1295,7 +1080,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
                     const SizedBox(height: 4),
                     Text(
                       _trackingId ?? '',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTeal, letterSpacing: 0.5),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryPurple, letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -1307,7 +1092,7 @@ class _GstServiceScreenState extends State<GstServiceScreen>
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryTeal,
+                    backgroundColor: primaryPurple,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -1318,6 +1103,182 @@ class _GstServiceScreenState extends State<GstServiceScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildResponsiveRow(BuildContext context, Widget child1, Widget child2) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        bool isWide = constraints.maxWidth > 650;
+        return isWide
+            ? Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: child1),
+                  const SizedBox(width: 14),
+                  Expanded(child: child2),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  child1,
+                  const SizedBox(height: 14),
+                  child2,
+                ],
+              );
+      },
+    );
+  }
+
+  Widget _buildInput(
+    String label,
+    TextEditingController controller, {
+    bool isNum = false,
+    String? placeholder,
+    IconData? prefixIcon,
+  }) {
+    final isReq = label.contains('*');
+    final cleanLabel = label.replaceAll('*', '').trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(
+            text: cleanLabel,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
+            children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          keyboardType: isNum ? TextInputType.number : TextInputType.text,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+          ),
+          validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateField(String label, TextEditingController controller) {
+    final isReq = label.contains('*');
+    final cleanLabel = label.replaceAll('*', '').trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(
+            text: cleanLabel,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
+            children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          ),
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () async {
+            final date = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(1900),
+              lastDate: DateTime(2100),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: primaryPurple,
+                      onPrimary: Colors.white,
+                      onSurface: textDarkHeading,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (date != null) {
+              setState(() {
+                controller.text = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+              });
+            }
+          },
+          child: IgnorePointer(
+            child: TextFormField(
+              controller: controller,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+              decoration: InputDecoration(
+                hintText: 'DD/MM/YYYY',
+                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                suffixIcon: const Icon(Icons.calendar_month_outlined, size: 20, color: primaryPurple),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                fillColor: const Color(0xFFFAFAFA),
+                filled: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+              ),
+              validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownField(
+    String label,
+    String? value,
+    List<String> items,
+    ValueChanged<String?> onChanged, {
+    String? hint,
+    IconData? prefixIcon,
+  }) {
+    final isReq = label.contains('*');
+    final cleanLabel = label.replaceAll('*', '').trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text.rich(
+          TextSpan(
+            text: cleanLabel,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
+            children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          ),
+        ),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          initialValue: items.contains(value) ? value : null,
+          hint: hint != null ? Text(hint, style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))) : null,
+          isExpanded: true,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+          decoration: InputDecoration(
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+          ),
+          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: textDarkHeading), overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: onChanged,
+          validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
+        ),
+      ],
     );
   }
 }
@@ -1349,41 +1310,54 @@ class _LoginModalState extends State<_LoginModal> {
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Login Required', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          const Text('Please login to submit your application.', style: TextStyle(color: Colors.grey, fontSize: 12.5)),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _idController,
-            decoration: const InputDecoration(labelText: 'Mobile or Email'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            height: 46,
-            child: ElevatedButton(
-              onPressed: _loading ? null : _handleLogin,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A896),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Login Required', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: textDarkHeading)),
+              const SizedBox(height: 4),
+              const Text('Please login to submit your GST application.', style: TextStyle(color: textSubdued, fontSize: 12.5)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _idController,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile or Email',
+                  labelStyle: TextStyle(color: textSubdued, fontSize: 13),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryPurple, width: 2)),
+                ),
               ),
-              child: _loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Login & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _passController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  labelStyle: TextStyle(color: textSubdued, fontSize: 13),
+                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryPurple, width: 2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton(
+                  onPressed: _loading ? null : _handleLogin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryPurple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _loading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                      : const Text('Login & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

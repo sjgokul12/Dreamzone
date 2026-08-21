@@ -20,94 +20,180 @@ class AdminApi {
 // ==================== STATUS HELPERS ====================
 
 Color statusColor(String? s) {
-  switch (s) {
-    case 'open': return Colors.blue;
-    case 'in_progress': return Colors.orange;
-    case 'pending': return Colors.orange;
-    case 'processing': return Colors.blue;
-    case 'completed': return Colors.green;
-    case 'resolved': return Colors.green;
-    case 'approved': return Colors.green;
-    case 'rejected': return Colors.red;
-    case 'contacted': return Colors.purple;
-    case 'closed': return Colors.grey;
-    default: return Colors.grey;
+  switch (s?.toLowerCase()) {
+    case 'open': return const Color(0xFF3B82F6);
+    case 'in_progress': return const Color(0xFFF59E0B);
+    case 'pending': return const Color(0xFFF97316);
+    case 'processing': return const Color(0xFF6366F1);
+    case 'completed': return const Color(0xFF10B981);
+    case 'resolved': return const Color(0xFF10B981);
+    case 'approved': return const Color(0xFF10B981);
+    case 'rejected': return const Color(0xFFEF4444);
+    case 'contacted': return const Color(0xFF8B5CF6);
+    case 'closed': return const Color(0xFF6B7280);
+    default: return const Color(0xFF6B7280);
   }
 }
 
 Widget statusChip(String? s) {
   final c = statusColor(s);
-  String label = (s ?? '').replaceAll('_', ' ').toUpperCase();
+  String raw = (s ?? 'Pending').replaceAll('_', ' ');
+  String label = raw.isEmpty ? 'Pending' : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+  
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: c.withAlpha(30),
-      borderRadius: BorderRadius.circular(20),
+      color: c.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: c.withValues(alpha: 0.25), width: 1),
     ),
     child: Text(
       label,
       style: TextStyle(
         color: c,
-        fontWeight: FontWeight.bold,
-        fontSize: 10,
+        fontWeight: FontWeight.w700,
+        fontSize: 11,
       ),
     ),
   );
 }
 
+// ─── Custom Wave Sparkline Painter ─────────────────────────────────────────
+class WaveSparklinePainter extends CustomPainter {
+  final Color color;
+  const WaveSparklinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    path.moveTo(0, h * 0.7);
+    path.cubicTo(w * 0.2, h * 0.2, w * 0.35, h * 0.9, w * 0.55, h * 0.4);
+    path.cubicTo(w * 0.75, h * 0.1, w * 0.85, h * 0.8, w, h * 0.3);
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 Widget statCard(String value, String label, IconData icon, Color color) {
   return Container(
-    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: color.withValues(alpha: 0.15), width: 1.4),
       boxShadow: [
         BoxShadow(
-          color: Colors.grey.withAlpha(30),
-          blurRadius: 8,
-          offset: const Offset(0, 3),
+          color: color.withValues(alpha: 0.07),
+          blurRadius: 16,
+          offset: const Offset(0, 5),
         ),
       ],
     ),
-    child: Row(
-      children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withAlpha(40), color.withAlpha(15)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: Stack(
+        children: [
+          // Background soft tint
+          Positioned(
+            right: -12,
+            top: -12,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.06),
+              ),
             ),
-            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icon, color: color, size: 24),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.trending_up_rounded, color: color, size: 12),
+                          const SizedBox(width: 3),
+                          Text(
+                            'Live',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 10,
+                const Spacer(),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFF374151),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+            ),
           ),
-        ),
-      ],
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 4,
+            height: 12,
+            child: CustomPaint(
+              painter: WaveSparklinePainter(color: color.withValues(alpha: 0.5)),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }

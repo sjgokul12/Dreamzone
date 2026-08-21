@@ -24,7 +24,6 @@ import '../career/career_screen.dart';
 import '../services/BBPS Services/Landline/Landline.dart';
 import '../services/BBPS Services/DTH/DTH.dart';
 import '../services/BBPS Services/Electricity/Electricity.dart';
-import '../services/BBPS Services/Piped Gas Bill/Piped Gas Bill.dart';
 import '../services/BBPS Services/Gas Cylinder/Gas Cylinder.dart';
 import '../services/BBPS Services/Recharge/recharge_screen.dart';
 import '../services/BBPS Services/Water/Water.dart';
@@ -37,10 +36,13 @@ import '../services/BBPS Services/Broadband/Broadband.dart';
 import '../services/BBPS Services/Insurance/Insurance.dart';
 import '../services/Payment Services/Money Transfer/Money Transfer.dart';
 import '../services/Travels/bus_booking_screen.dart';
+import 'bottom_navbar/bottom_navbar_screen.dart';
+import 'customer_reviews/customer_reviews_section.dart';
 
 class HomeScreen extends StatefulWidget {
   final bool isGuest;
-  const HomeScreen({super.key, this.isGuest = false});
+  final int initialIndex;
+  const HomeScreen({super.key, this.isGuest = false, this.initialIndex = 0});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -48,6 +50,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _homeScrollController = ScrollController();
   int _selectedIndex = 0;
   List<Map<String, dynamic>> _allServices = [];
   int _notificationCount = 0;
@@ -57,81 +60,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   late AnimationController _mainAnimationController;
   late AnimationController _pulseController;
-  late AnimationController _marqueeController;
+  late AnimationController _partnerMarqueeController;
+  late AnimationController _floatAnimationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
 
-  final PageController _reviewController = PageController(
-    viewportFraction: 0.88,
-  );
-  int _currentReview = 0;
-
-  // Dark Glassmorphism Theme Palette
-  static const Color kBgTop = Color(0xFF0F0826);
-  static const Color kBgBottom = Color(0xFF1A0F3D);
-  static const Color kCardColor = Color(0xFF241247);
-  static const Color kFieldColor = Color(0xFF2E1B57);
-  static const Color kAccentPink = Color(0xFFEC4899);
+  // Design Tokens
   static const Color kAccentPurple = Color(0xFF7C3AED);
-  static const Color kMutedText = Color(0xFFB3A8CC);
-  
-  static const Color primaryOrange = Color(0xFFEC4899); // Re-mapped to Pink
-  static const Color deepOrange = Color(0xFF7C3AED);
-  static const Color headerNavy = Color(0xFF1A0F3D);
-  static const Color headerNavyLight = Color(0xFF241247);
-  static const Color bgCream = Colors.white; // Full white background
-  static const Color cardWhite = Color(0xFF241247);
-  static const Color textDark = Colors.white;
+  static const Color primaryOrange = Color(0xFFEC4899);
+  static const Color bgCream = Colors.white;
   static const Color textLight = Color(0xFFB3A8CC);
-  static const Color dangerRed = Color(0xFFEF4444);
-  static const Color softOrange = Color(0xFF2E1B57);
 
   List<Map<String, dynamic>> get _homeServices {
     final defaultOrder = [
-      {
-        'id': 'aadhaar',
-        'name': 'Aadhaar',
-        'category': 'E-Government',
-        'icon': 'fingerprint',
-        'color': '#D97706',
-      },
-      {
-        'id': 'pan',
-        'name': 'PAN',
-        'category': 'E-Government',
-        'icon': 'description',
-        'color': '#2563EB',
-      },
-      {
-        'id': 'gst',
-        'name': 'GST',
-        'category': 'E-Government',
-        'icon': 'receipt_long',
-        'color': '#059669',
-      },
-      {
-        'id': 'voter',
-        'name': 'Voter ID',
-        'category': 'E-Government',
-        'icon': 'how_to_vote',
-        'color': '#7C3AED',
-      },
-      {
-        'id': 'fastag_purchase',
-        'name': 'Fastag',
-        'category': 'Home Product',
-        'asset_image': 'assets/Fastag Purchase.png',
-        'icon': 'directions_car',
-        'color': '#00A896',
-      },
-      {
-        'id': 'landline_bbps',
-        'name': 'Landline',
-        'category': 'BBPS Services',
-        'asset_image': 'assets/Landline.jpg',
-        'icon': 'phone_in_talk',
-        'color': '#2563EB',
-      },
+      {'id': 'aadhaar', 'name': 'Aadhaar', 'category': 'E-Government', 'icon': 'fingerprint', 'color': '#D97706'},
+      {'id': 'pan', 'name': 'PAN', 'category': 'E-Government', 'icon': 'description', 'color': '#2563EB'},
+      {'id': 'gst', 'name': 'GST', 'category': 'E-Government', 'icon': 'receipt_long', 'color': '#059669'},
+      {'id': 'voter', 'name': 'Voter ID', 'category': 'E-Government', 'icon': 'how_to_vote', 'color': '#7C3AED'},
+      {'id': 'fastag_purchase', 'name': 'Fastag', 'category': 'Home Product', 'asset_image': 'assets/Fastag Purchase.png', 'icon': 'directions_car', 'color': '#00A896'},
+      {'id': 'landline_bbps', 'name': 'Landline', 'category': 'BBPS Services', 'asset_image': 'assets/Landline.jpg', 'icon': 'phone_in_talk', 'color': '#2563EB'},
     ];
 
     final result = <Map<String, dynamic>>[];
@@ -149,72 +96,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (auth.services.isNotEmpty) {
-      _allServices = List<Map<String, dynamic>>.from(auth.services);
-    } else {
-      _allServices = [
-        {
-          'id': 'pan',
-          'name': 'PAN',
-          'category': 'E-Government',
-          'icon': 'description',
-          'color': '#2563EB',
-        },
-        {
-          'id': 'gst',
-          'name': 'GST Registration',
-          'category': 'E-Government',
-          'icon': 'receipt_long',
-          'color': '#059669',
-        },
-        {
-          'id': 'voter',
-          'name': 'Voter ID',
-          'category': 'E-Government',
-          'icon': 'how_to_vote',
-          'color': '#7C3AED',
-        },
-        {
-          'id': 'aadhaar',
-          'name': 'Aadhaar Card',
-          'category': 'E-Government',
-          'icon': 'fingerprint',
-          'color': '#D97706',
-        },
-        {
-          'id': 'fastag_purchase',
-          'name': 'Fastag Purchase',
-          'category': 'Home Product',
-          'asset_image': 'assets/Fastag Purchase.png',
-          'icon': 'directions_car',
-          'color': '#00A896',
-        },
-        {
-          'id': 'landline_bbps',
-          'name': 'Landline',
-          'category': 'BBPS Services',
-          'asset_image': 'assets/Landline.jpg',
-          'icon': 'phone_in_talk',
-          'color': '#2563EB',
-        },
-        {
-          'id': 'payments',
-          'name': 'Money Transfer',
-          'category': 'Payment Services',
-          'icon': 'payments',
-          'color': '#16A34A',
-        },
-        {
-          'id': 'recharge',
-          'name': 'Mobile Recharge',
-          'category': 'BBPS Services',
-          'icon': 'phone_android',
-          'color': '#059669',
-        },
-      ];
-    }
+    _selectedIndex = widget.initialIndex;
 
     _mainAnimationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -226,49 +108,116 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
     )..repeat(reverse: true);
 
-    _marqueeController = AnimationController(
-      duration: const Duration(milliseconds: 15000), // Medium speed slider
+    _partnerMarqueeController = AnimationController(
+      duration: const Duration(seconds: 16),
       vsync: this,
     )..repeat();
+
+    _floatAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 2400),
+      vsync: this,
+    )..repeat(reverse: true);
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _mainAnimationController, curve: Curves.easeOut),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _mainAnimationController,
-        curve: Curves.easeOutBack,
-      ),
+      CurvedAnimation(parent: _mainAnimationController, curve: Curves.easeOutBack),
     );
 
     _mainAnimationController.forward();
-    _startReviewAutoScroll();
     _loadData();
-  }
-
-  void _startReviewAutoScroll() {
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && _reviewController.hasClients) {
-        _currentReview = (_currentReview + 1) % 6;
-        _reviewController.animateToPage(
-          _currentReview,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOutCubic,
-        );
-        _startReviewAutoScroll();
-      }
-    });
   }
 
   @override
   void dispose() {
+    _homeScrollController.dispose();
     _mainAnimationController.dispose();
     _pulseController.dispose();
-    _marqueeController.dispose();
-    _reviewController.dispose();
+    _partnerMarqueeController.dispose();
+    _floatAnimationController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleCallSupport() async {
+    final uri = Uri.parse('tel:+919986074786');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Helpline: +91 9986074786'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF7C3AED),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Helpline: +91 9986074786'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF7C3AED),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleChatSupport() async {
+    final uri = Uri.parse('https://wa.me/919986074786?text=Hello%20DreamZone%20Support%2C%20I%20need%20assistance');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          _navigateWithAnimation(const HelpSupportScreen());
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        _navigateWithAnimation(const HelpSupportScreen());
+      }
+    }
+  }
+
+  Future<void> _handleEmailSupport() async {
+    final uri = Uri.parse('mailto:care@dreamzoneindia.in?subject=Assistance%20Request%20-%20DZI%20App');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Email: care@dreamzoneindia.in'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF2563EB),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Email: care@dreamzoneindia.in'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF2563EB),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
   }
 
   String _normalizeCategory(String? cat) {
@@ -276,11 +225,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final s = cat.trim();
     final lower = s.toLowerCase();
     if (lower.contains('banking')) return 'Payment Services';
-    if (lower.contains('business')) return 'E-Government';
-    if (lower.contains('government') || lower.contains('goverment')) {
+    if (lower.contains('business') || lower.contains('government') || lower.contains('goverment')) {
       return 'E-Government';
     }
-    if (lower.contains('financial')) return ''; // Exclude Financial Services
+    if (lower.contains('financial')) return '';
     if (lower.contains('travel')) return 'Travels';
     return s;
   }
@@ -288,215 +236,54 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _loadData() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
 
-    _api
-        .getAnnouncementCount()
-        .then((count) {
-          if (mounted) setState(() => _notificationCount = count);
-        })
-        .catchError((_) {});
+    _api.getAnnouncementCount().then((count) {
+      if (mounted) setState(() => _notificationCount = count);
+    }).catchError((_) {});
 
     await auth.loadServices();
 
     if (mounted) {
       setState(() {
         final seen = <String>{};
-        _allServices = auth.services
-            .map((s) {
-              final item = Map<String, dynamic>.from(s);
-              item['category'] = _normalizeCategory(
-                item['category']?.toString(),
-              );
-              return item;
-            })
-            .where((s) {
-              if ((s['category'] as String).isEmpty) return false;
-              final name = (s['name'] ?? '').toString();
-              if (seen.contains(name)) return false;
-              seen.add(name);
-              return true;
-            })
-            .toList();
+        _allServices = auth.services.map((s) {
+          final item = Map<String, dynamic>.from(s);
+          item['category'] = _normalizeCategory(item['category']?.toString());
+          return item;
+        }).where((s) {
+          if ((s['category'] as String).isEmpty) return false;
+          final name = (s['name'] ?? '').toString();
+          if (seen.contains(name)) return false;
+          seen.add(name);
+          return true;
+        }).toList();
 
-        final hasRecharge = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('recharge'),
-        );
-        if (!hasRecharge) {
-          _allServices.add({
-            'id': 'recharge',
-            'name': 'Mobile Recharge',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Postpaid Mobile Recharges.png',
-            'icon': 'phone_android',
-            'color': '#059669',
-          });
-        }
+        _ensureServiceExists('recharge', 'Mobile Recharge', 'BBPS Services', 'assets/Postpaid Mobile Recharges.png', 'phone_android', '#059669');
+        _ensureServiceExists('landline_bbps', 'Landline', 'BBPS Services', 'assets/Landline.png', 'phone_in_talk', '#2563EB');
+        _ensureServiceExists('dth_bbps', 'DTH Recharge', 'BBPS Services', 'assets/DTH.png', 'tv', '#6D28D9');
+        _ensureServiceExists('electricity_bbps', 'Electricity Bill', 'BBPS Services', 'assets/Electricity.png', 'bolt', '#0284C7');
+        _ensureServiceExists('piped_gas_bbps', 'Piped Gas Bill', 'BBPS Services', 'assets/Piped Gas Bill.jpg', 'propane_tank', '#0EA5E9');
+        _ensureServiceExists('gas_cylinder_bbps', 'Gas Cylinder', 'BBPS Services', 'assets/GAS.png', 'propane_tank', '#E11D48');
+        _ensureServiceExists('housing_society_bbps', 'Housing Society', 'BBPS Services', 'assets/Housing Society.png', 'home_work', '#5A80F6');
+        _ensureServiceExists('fastag_bbps', 'FASTag', 'BBPS Services', 'assets/Fastag.png', 'directions_car', '#FF2D6C');
+        _ensureServiceExists('metro_card_bbps', 'Metro Card Recharge', 'BBPS Services', 'assets/Metro card Recharge.png', 'subway', '#FF7D54');
+        _ensureServiceExists('broadband_bbps', 'Broadband Bill', 'BBPS Services', 'assets/Broadband.png', 'router', '#6366F1');
+        _ensureServiceExists('insurance_bbps', 'Insurance Premium', 'BBPS Services', 'assets/Insurance premium.png', 'health_and_safety', '#A855F7');
+        _ensureServiceExists('money_transfer_payment', 'Money Transfer', 'Payment Services', 'assets/Money Transfer.png', 'swap_horiz', '#00A896');
+      });
+    }
+  }
 
-        final hasLandline = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('landline'),
-        );
-        if (!hasLandline) {
-          _allServices.add({
-            'id': 'landline_bbps',
-            'name': 'Landline',
-            'category': 'BBPS Services',
-            'icon': 'phone_in_talk',
-            'color': '#2563EB',
-          });
-        }
-
-        final hasDth = _allServices.any(
-          (s) => (s['name'] ?? '').toString().toLowerCase().contains('dth'),
-        );
-        if (!hasDth) {
-          _allServices.add({
-            'id': 'dth_bbps',
-            'name': 'DTH Recharge',
-            'category': 'BBPS Services',
-            'icon': 'tv',
-            'color': '#6D28D9',
-          });
-        }
-
-        final hasElectricity = _allServices.any(
-          (s) => (s['name'] ?? '').toString().toLowerCase().contains(
-            'electricity',
-          ),
-        );
-        if (!hasElectricity) {
-          _allServices.add({
-            'id': 'electricity_bbps',
-            'name': 'Electricity Bill',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Electricity.png',
-            'icon': 'bolt',
-            'color': '#0284C7',
-          });
-        }
-
-        final hasPipedGas = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('piped gas'),
-        );
-        if (!hasPipedGas) {
-          _allServices.add({
-            'id': 'piped_gas_bbps',
-            'name': 'Piped Gas Bill',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Piped Gas Bill.jpg',
-            'icon': 'propane_tank',
-            'color': '#0EA5E9',
-          });
-        }
-
-        final hasGasCylinder = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('cylinder'),
-        );
-        if (!hasGasCylinder) {
-          _allServices.add({
-            'id': 'gas_cylinder_bbps',
-            'name': 'Gas Cylinder',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/GAS.png',
-            'icon': 'propane_tank',
-            'color': '#E11D48',
-          });
-        }
-
-        final hasHousing = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('housing') ||
-              (s['name'] ?? '').toString().toLowerCase().contains('society'),
-        );
-        if (!hasHousing) {
-          _allServices.add({
-            'id': 'housing_society_bbps',
-            'name': 'Housing Society',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Housing Society.png',
-            'icon': 'home_work',
-            'color': '#5A80F6',
-          });
-        }
-
-        final hasFastagRecharge = _allServices.any(
-          (s) =>
-              (s['id'] == 'fastag_bbps') ||
-              ((s['name'] ?? '').toString().toLowerCase().contains('fastag') &&
-                  (s['category'] ?? '').toString().toLowerCase().contains('bbps')),
-        );
-        if (!hasFastagRecharge) {
-          _allServices.add({
-            'id': 'fastag_bbps',
-            'name': 'FASTag',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Fastag.png',
-            'icon': 'directions_car',
-            'color': '#FF2D6C',
-          });
-        }
-
-        final hasMetro = _allServices.any(
-          (s) => (s['name'] ?? '').toString().toLowerCase().contains('metro'),
-        );
-        if (!hasMetro) {
-          _allServices.add({
-            'id': 'metro_card_bbps',
-            'name': 'Metro Card Recharge',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Metro card Recharge.png',
-            'icon': 'subway',
-            'color': '#FF7D54',
-          });
-        }
-
-        final hasBroadband = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('broadband'),
-        );
-        if (!hasBroadband) {
-          _allServices.add({
-            'id': 'broadband_bbps',
-            'name': 'Broadband Bill',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Broadband.png',
-            'icon': 'router',
-            'color': '#6366F1',
-          });
-        }
-
-        final hasInsurance = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('insurance'),
-        );
-        if (!hasInsurance) {
-          _allServices.add({
-            'id': 'insurance_bbps',
-            'name': 'Insurance Premium',
-            'category': 'BBPS Services',
-            'asset_image': 'assets/Insurance premium.png',
-            'icon': 'health_and_safety',
-            'color': '#A855F7',
-          });
-        }
-
-        final hasMoneyTransfer = _allServices.any(
-          (s) =>
-              (s['name'] ?? '').toString().toLowerCase().contains('money') ||
-              (s['name'] ?? '').toString().toLowerCase().contains('transfer'),
-        );
-        if (!hasMoneyTransfer) {
-          _allServices.add({
-            'id': 'money_transfer_payment',
-            'name': 'Money Transfer',
-            'category': 'Payment Services',
-            'asset_image': 'assets/Money Transfer.png',
-            'icon': 'swap_horiz',
-            'color': '#00A896',
-          });
-        }
+  void _ensureServiceExists(String id, String name, String category, String asset, String icon, String color) {
+    final key = name.toLowerCase().split(' ').first;
+    final exists = _allServices.any((s) => (s['name'] ?? '').toString().toLowerCase().contains(key));
+    if (!exists) {
+      _allServices.add({
+        'id': id,
+        'name': name,
+        'category': category,
+        'asset_image': asset,
+        'icon': icon,
+        'color': color,
       });
     }
   }
@@ -570,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  // ==================== SERVICE TAP WITH POPUP ====================
+  // ==================== SERVICE NAVIGATION ====================
   Future<void> _onServiceTap(Map<String, dynamic> service) async {
     final sId = (service['id'] ?? '').toString();
     final name = (service['name'] ?? '').toString().toLowerCase();
@@ -581,10 +368,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     if (sId == 'travel_bus' || name.contains('bus booking') || name.contains('bus ticket')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const BusBookingScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const BusBookingScreen()));
       return;
     }
 
@@ -592,13 +376,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (portalUrl != null && portalUrl.trim().isNotEmpty) {
       final uri = Uri.parse(portalUrl.trim());
       try {
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (!launched) {
-          await launchUrl(uri, mode: LaunchMode.platformDefault);
-        }
+        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!launched) await launchUrl(uri, mode: LaunchMode.platformDefault);
       } catch (_) {
         try {
           await launchUrl(uri, mode: LaunchMode.platformDefault);
@@ -610,153 +389,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final category = (service['category'] ?? '').toString().toLowerCase();
 
     if (name.contains('landline') || category.contains('landline')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LandlineScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const LandlineScreen()));
       return;
     }
-
     if (name.contains('dth') || category.contains('dth')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const DTHScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const DTHScreen()));
       return;
     }
-
     if (name.contains('electricity') || category.contains('electricity')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const ElectricityScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const ElectricityScreen()));
       return;
     }
-
-    if (name.contains('piped gas') || category.contains('piped gas')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PipedGasBillScreen()),
-      );
+    if (name.contains('piped gas') || category.contains('piped gas') || name.contains('gas') || category.contains('gas') || name.contains('cylinder') || category.contains('cylinder') || name.contains('lpg')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const GasCylinderScreen()));
       return;
     }
-
-    if (name.contains('cylinder') ||
-        category.contains('cylinder') ||
-        name.contains('lpg')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const GasCylinderScreen()),
-      );
-      return;
-    }
-
     if (name.contains('water') || category.contains('water')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const WaterScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const WaterScreen()));
       return;
     }
-
-    if (name.contains('education') ||
-        name.contains('school') ||
-        category.contains('education')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const EducationScreen()),
-      );
+    if (name.contains('education') || name.contains('school') || category.contains('education')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const EducationScreen()));
       return;
     }
-
-    if (name.contains('loan') ||
-        name.contains('repayment') ||
-        category.contains('loan')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const LoanPaymentScreen()),
-      );
+    if (name.contains('loan') || name.contains('repayment') || category.contains('loan')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const LoanPaymentScreen()));
       return;
     }
-
-    if (name.contains('fastag') ||
-        name.contains('toll') ||
-        category.contains('fastag')) {
+    if (name.contains('fastag') || name.contains('toll') || category.contains('fastag')) {
       if (name.contains('purchase')) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FastagPurchaseScreen(
-              service: service,
-              isGuest: widget.isGuest,
-            ),
-          ),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => FastagPurchaseScreen(service: service, isGuest: widget.isGuest)));
       } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const FastagScreen()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const FastagScreen()));
       }
       return;
     }
-
-    if (name.contains('metro') ||
-        name.contains('subway') ||
-        category.contains('metro')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const MetroCardScreen()),
-      );
+    if (name.contains('metro') || name.contains('subway') || category.contains('metro')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const MetroCardScreen()));
+      return;
+    }
+    if (name.contains('broadband') || name.contains('fiber') || category.contains('broadband')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const BroadbandScreen()));
+      return;
+    }
+    if (name.contains('insurance') || name.contains('policy') || category.contains('insurance')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const InsuranceScreen()));
+      return;
+    }
+    if (name.contains('money') || name.contains('dmt') || name.contains('transfer') || category.contains('payment')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const MoneyTransferScreen()));
+      return;
+    }
+    if (name.contains('housing') || name.contains('society') || category.contains('housing')) {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const HousingSocietyScreen()));
       return;
     }
 
-    if (name.contains('broadband') ||
-        name.contains('fiber') ||
-        category.contains('broadband')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const BroadbandScreen()),
-      );
-      return;
-    }
-
-    if (name.contains('insurance') ||
-        name.contains('policy') ||
-        category.contains('insurance')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const InsuranceScreen()),
-      );
-      return;
-    }
-
-    if (name.contains('money') ||
-        name.contains('dmt') ||
-        name.contains('transfer') ||
-        category.contains('payment')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const MoneyTransferScreen()),
-      );
-      return;
-    }
-
-    if (name.contains('housing') ||
-        name.contains('society') ||
-        category.contains('housing')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const HousingSocietyScreen()),
-      );
-      return;
-    }
-
-    if ((name.contains('recharge') || category.contains('recharge')) &&
-        !name.contains('fastag') &&
-        !name.contains('dth') &&
-        !name.contains('metro')) {
-      final opts = [
+    if ((name.contains('recharge') || category.contains('recharge')) && !name.contains('fastag') && !name.contains('dth') && !name.contains('metro')) {
+      _showModernServicePopup(service, [
         {
           'title': 'Prepaid Mobile Recharge',
           'subtitle': 'Recharge your prepaid mobile number',
@@ -773,8 +463,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'icon_color': const Color(0xFFDB2777),
           'section_data': {'id': 902, 'section_name': 'Postpaid', 'is_postpaid': true},
         },
-      ];
-      _showModernServicePopup(service, opts);
+      ]);
       return;
     }
 
@@ -782,14 +471,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final intId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
 
     List<Map<String, dynamic>> sections = [];
-
     if (intId != null) {
       try {
-        final result = await _api
-            .getServiceSections(intId)
-            .timeout(const Duration(milliseconds: 1500));
-        sections =
-            (result['sections'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final result = await _api.getServiceSections(intId).timeout(const Duration(milliseconds: 1500));
+        sections = (result['sections'] as List?)?.cast<Map<String, dynamic>>() ?? [];
       } catch (_) {}
     }
 
@@ -808,19 +493,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           {'id': 203, 'section_name': 'Foreign PAN Application'},
         ];
       } else if (sName.contains('gst')) {
-        sections = [
-          {'id': 301, 'section_name': 'GST Registration'},
-        ];
+        sections = [{'id': 301, 'section_name': 'GST Registration'}];
       } else if (sName.contains('aadhaar') || sName.contains('aadhar')) {
         sections = [
           {'id': 401, 'section_name': 'Soft Copy'},
           {'id': 402, 'section_name': 'Hard Copy'},
-        ];
-      } else if (sName.contains('aeps')) {
-        sections = [
-          {'id': 501, 'section_name': 'Cash Withdrawal'},
-          {'id': 502, 'section_name': 'Balance Enquiry'},
-          {'id': 503, 'section_name': 'Mini Statement'},
         ];
       }
     }
@@ -837,10 +514,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  void _openDetailScreen(
-    Map<String, dynamic> service,
-    Map<String, dynamic>? section,
-  ) {
+  void _openDetailScreen(Map<String, dynamic> service, Map<String, dynamic>? section) {
     final sName = (service['name'] ?? '').toString().toLowerCase();
     Widget targetScreen;
 
@@ -859,9 +533,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         preselectedSectionData: section,
       );
     } else if (sName.contains('mobile recharge') || (sName.contains('recharge') && !sName.contains('fastag') && !sName.contains('dth') && !sName.contains('metro'))) {
-      targetScreen = RechargeScreen(
-        initialIsPostpaid: section?['is_postpaid'] == true,
-      );
+      targetScreen = RechargeScreen(initialIsPostpaid: section?['is_postpaid'] == true);
     } else if (sName.contains('gst')) {
       targetScreen = GstServiceScreen(
         service: service,
@@ -911,6 +583,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         preselectedSectionId: section != null ? section['id'] as int? : null,
         preselectedSectionData: section,
       );
+    } else if (sName.contains('gas') || sName.contains('cylinder') || sName.contains('piped gas') || sName.contains('lpg')) {
+      targetScreen = const GasCylinderScreen();
+    } else if (sName.contains('money') || sName.contains('transfer') || sName.contains('remitter') || sName.contains('dmt')) {
+      targetScreen = const MoneyTransferScreen();
     } else {
       targetScreen = ServiceDetailScreen(
         service: service,
@@ -928,14 +604,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           return FadeTransition(
             opacity: animation,
             child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.2, 0),
-                end: Offset.zero,
-              ).animate(
-                CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                ),
+              position: Tween<Offset>(begin: const Offset(0.2, 0), end: Offset.zero).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
               ),
               child: ScaleTransition(
                 scale: Tween<double>(begin: 0.9, end: 1.0).animate(animation),
@@ -953,15 +623,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final sName = (service['name'] ?? 'Service').toString();
     final lower = sName.toLowerCase();
 
-    // Default icon
     String logoAsset = 'assets/Explore.png';
     if (lower.contains('aadhaar') || lower.contains('aadhar')) {
       logoAsset = 'assets/Aadhaar.png';
-    } else if (lower.contains('pan')) logoAsset = 'assets/PAN.png';
-    else if (lower.contains('voter')) logoAsset = 'assets/Voter.png';
-    else if (lower.contains('passport')) logoAsset = 'assets/Passport.png';
+    } else if (lower.contains('pan')) {
+      logoAsset = 'assets/PAN.png';
+    } else if (lower.contains('voter')) {
+      logoAsset = 'assets/Voter.png';
+    } else if (lower.contains('passport')) {
+      logoAsset = 'assets/Passport.png';
+    }
 
-    // Subtitle
     String subtitle = 'Choose the type of $sName service you need';
 
     showModalBottomSheet(
@@ -976,14 +648,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             constraints: const BoxConstraints(maxWidth: 440),
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
             decoration: const BoxDecoration(
-              color: Color(0xFFFAFAFF), // Very light purple/blue tint
+              color: Color(0xFFFAFAFF),
               borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
               boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 40, offset: Offset(0, -10))],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top drag handle
                 Container(
                   width: 40,
                   height: 4,
@@ -993,7 +664,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                // Top header row with close button
                 Align(
                   alignment: Alignment.topRight,
                   child: GestureDetector(
@@ -1001,8 +671,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     child: const Icon(Icons.close, color: Color(0xFF7C6CF0), size: 24),
                   ),
                 ),
-
-                // Logo Container
                 Container(
                   width: 90,
                   height: 90,
@@ -1015,8 +683,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   child: Image.asset(logoAsset, fit: BoxFit.contain),
                 ),
                 const SizedBox(height: 20),
-
-                // Title & Subtitle
                 Text(
                   '$sName Services',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF161A3A)),
@@ -1028,15 +694,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF9698B5)),
                 ),
                 const SizedBox(height: 24),
-
-                // Options List
                 ...options.map((opt) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: GestureDetector(
                       onTap: () {
                         Navigator.pop(ctx);
-                        _openDetailScreen(service, opt['section_data'] as Map<String, dynamic>?); // Pass the original section object
+                        _openDetailScreen(service, opt['section_data'] as Map<String, dynamic>?);
                       },
                       child: Container(
                         padding: const EdgeInsets.all(16),
@@ -1048,7 +712,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         child: Row(
                           children: [
-                            // Option Icon
                             Container(
                               width: 44,
                               height: 44,
@@ -1059,7 +722,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               child: Icon(opt['icon'] as IconData, color: opt['icon_color'] as Color, size: 22),
                             ),
                             const SizedBox(width: 16),
-                            // Option Texts
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1076,7 +738,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 ],
                               ),
                             ),
-                            // Arrow Button
                             Container(
                               width: 32,
                               height: 32,
@@ -1096,10 +757,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   );
                 }),
-
                 const SizedBox(height: 8),
-
-                // Footer
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
@@ -1136,14 +794,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showSectionPopup(Map<String, dynamic> service, List<dynamic> sections) {
-    const tealPrimary = Color(0xFF00A896);
-    const tealDark = Color(0xFF0284C7);
-
     final serviceName = (service['name'] ?? '').toString().toLowerCase();
 
-    // 1. Aadhaar
     if (serviceName.contains('aadhaar') || serviceName.contains('aadhar')) {
-      final opts = [
+      _showModernServicePopup(service, [
         {
           'title': 'Aadhaar Soft Copy',
           'subtitle': 'Get your Aadhaar card soft copy (PDF)',
@@ -1160,14 +814,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'icon_color': const Color(0xFFDB2777),
           'section_data': {'id': 402, 'section_name': 'Hard Copy'},
         },
-      ];
-      _showModernServicePopup(service, opts);
+      ]);
       return;
     }
 
-    // 2. PAN
     if (serviceName.contains('pan')) {
-      final opts = [
+      _showModernServicePopup(service, [
         {
           'title': 'New PAN Card',
           'subtitle': 'Apply for a brand new PAN card',
@@ -1200,14 +852,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'icon_color': const Color(0xFF9333EA),
           'section_data': {'id': 204, 'section_name': 'Find PAN'},
         },
-      ];
-      _showModernServicePopup(service, opts);
+      ]);
       return;
     }
 
-    // 3. Voter ID
     if (serviceName.contains('voter')) {
-      final opts = [
+      _showModernServicePopup(service, [
         {
           'title': 'New Voter ID',
           'subtitle': 'Apply for a new Voter ID card',
@@ -1240,14 +890,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'icon_color': const Color(0xFF9333EA),
           'section_data': {'id': 104, 'section_name': 'Download E-Voter Card'},
         },
-      ];
-      _showModernServicePopup(service, opts);
+      ]);
       return;
     }
 
-    // 4. Passport
     if (serviceName.contains('passport')) {
-      final opts = [
+      _showModernServicePopup(service, [
         {
           'title': 'New Passport',
           'subtitle': 'Apply for a new Indian passport',
@@ -1280,208 +928,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           'icon_color': const Color(0xFF16A34A),
           'section_data': {'id': 7, 'section_name': 'PCC'},
         },
-      ];
-      _showModernServicePopup(service, opts);
+      ]);
       return;
     }
 
-    List<dynamic> effectiveSections = List.from(sections);
+    final opts = sections.map((sec) {
+      final s = Map<String, dynamic>.from(sec);
+      return {
+        'title': s['section_name'] ?? 'Section',
+        'subtitle': 'Complete application details',
+        'icon': Icons.description_outlined,
+        'icon_bg': const Color(0xFFF3E8FF),
+        'icon_color': const Color(0xFF9333EA),
+        'section_data': s,
+      };
+    }).toList();
 
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withAlpha(190),
-      builder: (ctx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: tealPrimary.withAlpha(60),
-                  blurRadius: 30,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Top Header Banner with Teal Gradient
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 16, 20),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [tealPrimary, tealDark],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(45),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          _parseIcon(service['icon']),
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              (service['name'] ?? 'Service Option').toString(),
-                              style: const TextStyle(
-                                fontSize: 19,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Select an option to proceed',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // List of Section Options with Modern Cards
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: effectiveSections.map((sec) {
-                      final section = Map<String, dynamic>.from(sec);
-                      final secName = (section['section_name'] ?? '').toString();
-                      final isSoft = secName.toLowerCase().contains('soft');
-                      final isHard = secName.toLowerCase().contains('hard');
-                      final isFind = secName.toLowerCase().contains('find');
-                      final isNew = secName.toLowerCase().contains('new');
-                      final isForeign = secName.toLowerCase().contains('foreign');
-
-                      IconData secIcon = Icons.credit_card_rounded;
-                      String subtitle = 'Complete application details';
-                      if (isSoft) {
-                        secIcon = Icons.picture_as_pdf_rounded;
-                        subtitle = 'Instant E-Aadhaar Digital Soft Copy';
-                      } else if (isHard) {
-                        secIcon = Icons.credit_card_rounded;
-                        subtitle = 'Physical PVC Card Delivered to Address';
-                      } else if (isFind) {
-                        secIcon = Icons.search_rounded;
-                        subtitle = 'Find existing PAN by Aadhaar number';
-                      } else if (isNew) {
-                        secIcon = Icons.add_card_rounded;
-                        subtitle = 'Apply for new PAN card';
-                      } else if (isForeign) {
-                        secIcon = Icons.language_rounded;
-                        subtitle = 'Apply for Foreign PAN card';
-                      }
-
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              _openDetailScreen(service, section);
-                            },
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: tealPrimary.withAlpha(50),
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(8),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color: tealPrimary.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(secIcon, color: tealPrimary, size: 22),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          secName,
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color(0xFF1E293B),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          subtitle,
-                                          style: const TextStyle(
-                                            fontSize: 11,
-                                            color: Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Icon(
-                                    Icons.arrow_forward_ios_rounded,
-                                    size: 16,
-                                    color: tealPrimary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+    _showModernServicePopup(service, opts);
   }
 
   void _showLoginPage() {
@@ -1506,9 +969,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _viewAllServices() {
-    setState(() {
-      _selectedIndex = 1;
-    });
+    setState(() => _selectedIndex = 1);
   }
 
   void _navigateWithAnimation(Widget screen) {
@@ -1518,13 +979,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         pageBuilder: (_, a, b) => screen,
         transitionsBuilder: (_, animation, _, child) {
           return SlideTransition(
-            position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
-                .animate(
-                  CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                  ),
-                ),
+            position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            ),
             child: FadeTransition(opacity: animation, child: child),
           );
         },
@@ -1551,9 +1008,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: PopScope(
         canPop: _selectedIndex == 0,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            setState(() => _selectedIndex = 0);
-          }
+          if (!didPop) setState(() => _selectedIndex = 0);
         },
         child: Scaffold(
           key: _scaffoldKey,
@@ -1566,21 +1021,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               index: _selectedIndex,
               children: [
                 _buildHomeBody(isGuest),
-                // Tab 1: Categories (All Services)
                 AllServicesScreen(
                   key: ValueKey('services_${_allServices.length}'),
                   services: _allServices,
                   isGuest: isGuest,
                   showBackButton: false,
                 ),
-                // Tab 2: My Service Requests
                 const MyApplicationsScreen(showBackButton: false),
-                // Tab 3: Profile / You
                 const ProfileScreen(showBackButton: false),
               ],
             ),
           ),
-          bottomNavigationBar: _buildBottomNav(),
+          bottomNavigationBar: HomeBottomNavBar(
+            selectedIndex: _selectedIndex,
+            onTabSelected: (index) {
+              setState(() => _selectedIndex = index);
+            },
+          ),
         ),
       ),
     );
@@ -1589,38 +1046,36 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // ==================== HOME TAB BODY CONTENT ====================
   Widget _buildHomeBody(bool isGuest) {
     return RefreshIndicator(
-      color: primaryOrange,
-      backgroundColor: cardWhite,
+      color: kAccentPurple,
+      backgroundColor: Colors.white,
       onRefresh: () async => _loadData(),
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: FadeTransition(
           opacity: _fadeAnimation,
           child: SingleChildScrollView(
+            controller: _homeScrollController,
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildCurvedHeaderSection(isGuest),
                 _buildSearchBarOverlay(),
-                _buildSectionTitle(
-                  'Premium Services',
-                  onViewAll: _viewAllServices,
-                ),
+                _buildSectionTitle('Premium Services', onViewAll: _viewAllServices),
                 const SizedBox(height: 16),
-                _buildServicesGrid(),
+                RepaintBoundary(child: _buildServicesGrid()),
                 const SizedBox(height: 32),
                 _buildSectionTitle('Why Choose Us'),
                 const SizedBox(height: 16),
-                _buildWhyChooseUs(),
+                RepaintBoundary(child: _buildWhyChooseUs()),
                 const SizedBox(height: 32),
-                _buildStatsWithAnimation(),
+                RepaintBoundary(child: _buildStatsWithAnimation()),
                 const SizedBox(height: 32),
-                _buildPoweredBySlider(),
-                const SizedBox(height: 38),
-                _buildTestimonialsCarousel(),
-                const SizedBox(height: 32),
-                _buildContactCTA(),
+                _buildPoweredByPlatform(),
+                const SizedBox(height: 54),
+                const RepaintBoundary(child: CustomerReviewsSection()),
+                const SizedBox(height: 48),
+                RepaintBoundary(child: _buildContactCTA()),
                 const SizedBox(height: 100),
               ],
             ),
@@ -1630,257 +1085,379 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ==================== IMAGE-EXACT STYLISH TOP APP BAR ====================
+  // ==================== HEADER SECTION (COMPACT & PROPORTIONAL) ====================
   Widget _buildCurvedHeaderSection(bool isGuest) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFFBFAFF), Color(0xFFF0ECFE), Color(0xFFF8F6FF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(34),
-          bottomRight: Radius.circular(34),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x1F7C6CF0),
-            blurRadius: 28,
-            offset: Offset(0, 10),
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFF3EDFF),
+          image: DecorationImage(
+            image: AssetImage('assets/Backgrounddzi.png'),
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
           ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Nav Controls Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Left: Logo & Title
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 4), // Padding where icon used to be
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text(
-                            'DZI Infinity',
-                            style: TextStyle(
-                              color: Color(0xFF161A3A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              height: 1.1,
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ─── Top Bar ───────────────────────────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Logo + Title + PRO ACCOUNT
+                    Row(
+                      children: [
+                        // Gradient DZI Infinity Logo
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF4F46E5), Color(0xFF7C3AED), Color(0xFF3B82F6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Text(
+                                'DZI',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                  height: 1.0,
+                                ),
+                              ),
+                              SizedBox(height: 1),
+                              Text(
+                                '∞',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  height: 0.9,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'DZI Infinity',
+                              style: TextStyle(
+                                color: Color(0xFF0F172A),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.3,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEDE9FE),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'PRO ACCOUNT',
+                                style: TextStyle(
+                                  color: Color(0xFF7C3AED),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    // Notification + Hamburger Menu
+                    Row(
+                      children: [
+                        // Notification Icon
+                        InkWell(
+                          onTap: () => _navigateWithAnimation(const NotificationsScreen()),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.notifications_none_rounded,
+                                  color: Color(0xFF0F172A),
+                                  size: 20,
+                                ),
+                                Positioned(
+                                  right: 6,
+                                  top: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFF43F5E),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0x60F43F5E),
+                                          blurRadius: 5,
+                                          offset: Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _notificationCount > 0 ? '$_notificationCount' : '5',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8.5,
+                                        fontWeight: FontWeight.w900,
+                                        height: 1.0,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          Text(
-                            'PRO ACCOUNT',
+                        ),
+                        const SizedBox(width: 8),
+                        // Hamburger Menu Icon
+                        InkWell(
+                          onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.menu_rounded,
+                              color: Color(0xFF0F172A),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ─── Welcome Badge ─────────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1F2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFFFE4E6)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF43F5E).withValues(alpha: 0.06),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'WELCOME BACK',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: Color(0xFFF43F5E),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text('👋', style: TextStyle(fontSize: 11)),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // ─── Main Hero Heading ─────────────────────────────────────
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(
+                        text: "Let's explore\n",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                          height: 1.15,
+                        ),
+                      ),
+                      const TextSpan(
+                        text: "DZI Infinity ",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF0F172A),
+                          letterSpacing: -0.5,
+                          height: 1.15,
+                        ),
+                      ),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.baseline,
+                        baseline: TextBaseline.alphabetic,
+                        child: ShaderMask(
+                          shaderCallback: (bounds) {
+                            return const LinearGradient(
+                              colors: [Color(0xFF8B5CF6), Color(0xFFD946EF), Color(0xFFEC4899)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ).createShader(bounds);
+                          },
+                          child: const Text(
+                            "PRO",
                             style: TextStyle(
-                              color: Color(0xFF9698B5),
-                              fontSize: 10.5,
-                              letterSpacing: 1,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ─── Status Chips ──────────────────────────────────────────
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(color: Color(0xFF10B981), blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'All systems online',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF334155),
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-
-                  // Right Actions
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(color: const Color(0x14161A3A)),
-                            boxShadow: const [BoxShadow(color: Color(0x141E1B4B), blurRadius: 30, offset: Offset(0, 10))],
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                          child: const Icon(Icons.menu, color: Color(0xFF161A3A), size: 19),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      InkWell(
-                        onTap: () => _navigateWithAnimation(const NotificationsScreen()),
-                        child: Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(13),
-                            border: Border.all(color: const Color(0x14161A3A)),
-                            boxShadow: const [BoxShadow(color: Color(0x141E1B4B), blurRadius: 30, offset: Offset(0, 10))],
-                          ),
-                          child: Stack(
-                            clipBehavior: Clip.none,
-                            alignment: Alignment.center,
-                            children: [
-                              const Icon(Icons.notifications_none_rounded, color: Color(0xFF161A3A), size: 20),
-                              if (_notificationCount > 0)
-                                Positioned(
-                                  right: -4,
-                                  top: -4,
-                                  child: Container(
-                                    width: 18,
-                                    height: 18,
-                                    decoration: const BoxDecoration(
-                                      gradient: LinearGradient(colors: [kAccentPink, kAccentPurple]),
-                                      shape: BoxShape.circle,
-                                      boxShadow: [BoxShadow(color: Color(0x73E23E7B), blurRadius: 10, offset: Offset(0, 4))],
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      '$_notificationCount',
-                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                ],
-              ),
-
-              const SizedBox(height: 22),
-
-              // Eyebrow
-              Row(
-                children: const [
-                  Text(
-                    'WELCOME BACK',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                      color: kAccentPink,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              // Headline
-              Text.rich(
-                TextSpan(
-                  children: [
-                    const TextSpan(
-                      text: "Let's explore\n",
-                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF161A3A), height: 1.18),
-                    ),
-                    const TextSpan(
-                      text: "DZI Infinity ",
-                      style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Color(0xFF161A3A), height: 1.18),
-                    ),
-                    WidgetSpan(
-                      alignment: PlaceholderAlignment.baseline,
-                      baseline: TextBaseline.alphabetic,
-                      child: AnimatedBuilder(
-                        animation: _pulseController,
-                        builder: (context, child) {
-                          return ShaderMask(
-                            shaderCallback: (bounds) {
-                              // Moving shine effect
-                              return LinearGradient(
-                                colors: const [
-                                  Color(0xFF5544D6),
-                                  Color(0xFFE23E7B), // Add pink/rose for more vibrant animation
-                                  Color(0xFFB9AFFF),
-                                  Color(0xFF5544D6),
-                                ],
-                                stops: [
-                                  0.0,
-                                  0.3 + (_pulseController.value * 0.4),
-                                  0.6 + (_pulseController.value * 0.4),
-                                  1.0,
-                                ],
-                                begin: Alignment(-1.0 + (_pulseController.value * 2), -1.0),
-                                end: Alignment(1.0 + (_pulseController.value * 2), 1.0),
-                              ).createShader(bounds);
-                            },
-                            child: const Text(
-                              "PRO",
-                              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white, height: 1.18),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text('⚡', style: TextStyle(fontSize: 11)),
+                          SizedBox(width: 5),
+                          Text(
+                            'Instant service',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF334155),
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Badges
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0x237C6CF0)),
-                      boxShadow: const [BoxShadow(color: Color(0x141E1B4B), blurRadius: 30, offset: Offset(0, 10))],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: kAccentPink,
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: kAccentPink, blurRadius: 8)],
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'All systems online',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF5B5E82)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0x237C6CF0)),
-                      boxShadow: const [BoxShadow(color: Color(0x141E1B4B), blurRadius: 30, offset: Offset(0, 10))],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text('⚡', style: TextStyle(fontSize: 10)),
-                        SizedBox(width: 6),
-                        Text(
-                          'Instant service',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF5B5E82)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         ),
       ),
@@ -1889,51 +1466,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ==================== SEARCH BAR OVERLAY ====================
   Widget _buildSearchBarOverlay() {
-    return Transform.translate(
-      offset: const Offset(0, -26),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0x1E7C6CF0)),
-            boxShadow: const [BoxShadow(color: Color(0x281E1B4B), blurRadius: 45, offset: Offset(0, 20))],
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.search, color: Color(0xFF9698B5), size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  style: const TextStyle(fontSize: 14.5, color: Color(0xFF161A3A)),
-                  decoration: const InputDecoration(
-                    hintText: "Search 'Services'",
-                    hintStyle: TextStyle(color: Color(0xFF9698B5), fontSize: 14.5),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
+    return RepaintBoundary(
+      child: Transform.translate(
+        offset: const Offset(0, -18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Container(
+            height: 52,
+            padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.07),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                    decoration: const InputDecoration(
+                      hintText: "Search 'Services'",
+                      hintStyle: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, fontWeight: FontWeight.w500),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF7C6CF0), Color(0xFFB9AFFF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8B5CF6), Color(0xFFA855F7), Color(0xFFEC4899)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: const [BoxShadow(color: Color(0x597C6CF0), blurRadius: 14, offset: Offset(0, 6))],
+                  child: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
                 ),
-                child: const Icon(Icons.mic, color: Colors.white, size: 16),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1944,16 +1536,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget _buildDrawer(bool isGuest) {
     final auth = Provider.of<AuthProvider>(context);
     final name = isGuest ? 'Guest User' : (auth.userName ?? 'User');
-    final email = isGuest
-        ? 'Tap login to access all services'
-        : (auth.userEmail ?? '');
+    final email = isGuest ? 'Tap login to access all services' : (auth.userEmail ?? '');
     final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
     return Drawer(
-      backgroundColor: const Color(0xFFF8FAFC), // very light blue/grey
+      backgroundColor: const Color(0xFFF8FAFC),
       child: Column(
         children: [
-          // Sleek Modern Header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 64, 24, 24),
@@ -1964,7 +1553,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar and Close button
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1974,7 +1562,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       height: 64,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFFDFC5FE), Color(0xFFC084FC)], // Purplish accent
+                          colors: [Color(0xFFDFC5FE), Color(0xFFC084FC)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
@@ -2001,9 +1589,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     IconButton(
                       icon: const Icon(Icons.close_rounded, color: Color(0xFF94A3B8)),
                       onPressed: () => Navigator.pop(context),
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFF1F5F9),
-                      ),
+                      style: IconButton.styleFrom(backgroundColor: const Color(0xFFF1F5F9)),
                     ),
                   ],
                 ),
@@ -2029,8 +1615,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          
-          // Drawer Menu List Items
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -2044,7 +1628,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   _drawerTile(
                     icon: Icons.login_rounded,
                     title: 'Login / Sign Up',
-                    accentColor: const Color.fromARGB(255, 182, 145, 227), // Pink accent
+                    accentColor: const Color.fromARGB(255, 182, 145, 227),
                     onTap: () {
                       Navigator.pop(context);
                       _showLoginPage();
@@ -2098,11 +1682,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   _drawerTile(
                     icon: Icons.logout_rounded,
                     title: 'Logout',
-                    accentColor: const Color(0xFFEF4444), // Red for logout
+                    accentColor: const Color(0xFFEF4444),
                     onTap: () async {
                       Navigator.pop(context);
                       await auth.logout();
-                      if (context.mounted) {
+                      if (mounted) {
                         Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -2120,13 +1704,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               padding: const EdgeInsets.all(20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.shield_rounded, size: 14, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 6),
+                children: const [
+                  Icon(Icons.shield_rounded, size: 14, color: Color(0xFF94A3B8)),
+                  SizedBox(width: 6),
                   Text(
                     'Version 2.4.0 • Secure Portal',
                     style: TextStyle(
-                      color: const Color(0xFF94A3B8), 
+                      color: Color(0xFF94A3B8),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2146,7 +1730,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     required VoidCallback onTap,
     Color? accentColor,
   }) {
-    final Color defaultColor = const Color(0xFF334155); // Slate 700
+    final Color defaultColor = const Color(0xFF334155);
     final Color actualColor = accentColor ?? defaultColor;
     final bool isHighlighted = accentColor != null;
 
@@ -2191,6 +1775,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // ==================== SECTION TITLE ====================
   Widget _buildSectionTitle(String title, {VoidCallback? onViewAll}) {
+    final bool isPremiumServices = title.toLowerCase().contains('premium');
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -2199,26 +1785,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           Expanded(
             child: Row(
               children: [
+                // Vertical Pink Bar
                 Container(
                   width: 4,
-                  height: 18,
+                  height: 22,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE8733F), Color(0xFFE23E7B)], // Amber to Rose
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                    borderRadius: BorderRadius.circular(3),
+                    color: const Color(0xFFF43F5E),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Crown / Star Icon Container if Premium Services
+                if (isPremiumServices) ...[
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8B5CF6), Color(0xFFC084FC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF8B5CF6).withValues(alpha: 0.25),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.workspace_premium_rounded,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: Text(
                     title,
                     style: const TextStyle(
                       fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF161A3A), // Dark text for light background
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2231,10 +1843,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               onTap: onViewAll,
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: const Color(0x19FF7A3D),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFDF2F8), Color(0xFFF5F3FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFFBCFE8)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2243,15 +1860,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       'View All',
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFE8733F),
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFD946EF),
                       ),
                     ),
                     SizedBox(width: 4),
                     Icon(
                       Icons.arrow_forward_rounded,
                       size: 14,
-                      color: Color(0xFFE8733F),
+                      color: Color(0xFFD946EF),
                     ),
                   ],
                 ),
@@ -2262,20 +1879,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  List<Color> _getServiceGradientColors(String lowerName) {
-    if (lowerName.contains('aadhaar')) return const [Color(0xFFFF7A3D), Color(0xFFFFB35E)];
-    if (lowerName.contains('pan')) return const [Color(0xFF12B886), Color(0xFF4FD8AE)];
-    if (lowerName.contains('gst')) return const [Color(0xFF4361EE), Color(0xFF7C6CF0)];
-    if (lowerName.contains('voter')) return const [Color(0xFFE23E7B), Color(0xFFFF7AA8)];
-    if (lowerName.contains('fastag')) return const [Color(0xFFF6B93B), Color(0xFFFFD873)];
-    if (lowerName.contains('landline')) return const [Color(0xFF6C5CE7), Color(0xFFA29BFE)];
-    // default
-    return const [Color(0xFF4361EE), Color(0xFF7C6CF0)];
-  }
-
   // ==================== SERVICES GRID ====================
   Widget _buildServicesGrid() {
-    // Filter services by search query
     final services = _searchQuery.isEmpty
         ? _homeServices
         : _homeServices.where((s) {
@@ -2339,14 +1944,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final screenWidth = MediaQuery.of(context).size.width;
-          // Responsive: 3 columns for most phones, 4 for tablets/large phones
           final crossAxisCount = screenWidth > 500 ? 4 : 3;
           final spacing = 14.0;
           final totalSpacing = spacing * (crossAxisCount - 1);
           final cardWidth = (constraints.maxWidth - totalSpacing) / crossAxisCount;
-          // Scale aspect ratio based on card width for a squarer, shorter look
           final childAspectRatio = cardWidth < 95 ? 0.68 : (cardWidth > 130 ? 0.78 : 0.72);
-          // Responsive font and icon scaling
           final scaleFactor = (screenWidth / 375.0).clamp(0.85, 1.2);
 
           return GridView.builder(
@@ -2365,36 +1967,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               final Color color = _parseColor(s['color']);
               final IconData icon = _parseIcon(s['icon']);
               final String imageUrl = _imageUrl(s['image_url']?.toString());
-              final lowerName = name.toLowerCase();
-
-              final isEnlargedTarget =
-                  lowerName.contains('dth') ||
-                  lowerName.contains('electricity') ||
-                  lowerName.contains('piped') ||
-                  lowerName.contains('gas') ||
-                  lowerName.contains('water') ||
-                  lowerName.contains('education') ||
-                  lowerName.contains('loan') ||
-                  lowerName.contains('municipal') ||
-                  lowerName.contains('recharge') ||
-                  lowerName.contains('mobile') ||
-                  lowerName.contains('house') ||
-                  lowerName.contains('housing') ||
-                  lowerName.contains('fastag') ||
-                  lowerName.contains('metro') ||
-                  lowerName.contains('broad') ||
-                  lowerName.contains('insurance');
-              final double baseLogo = isEnlargedTarget ? 76.0 : 64.0;
-              final double logoSize = baseLogo * scaleFactor;
-
               final assetImg = (s['asset_image'] ?? '').toString();
-              String localAsset = assetImg;
-              if (localAsset.isEmpty) {
-                if (lowerName.contains('landline')) localAsset = 'assets/Landline.png';
-                if (lowerName.contains('dth')) localAsset = 'assets/DTH.png';
-                if (lowerName.contains('electricity')) localAsset = 'assets/Electricity.png';
-                if (lowerName.contains('piped gas')) localAsset = 'assets/Piped Gas Bill.jpg';
-              }
 
               return GestureDetector(
                 onTap: () => _onServiceTap(s),
@@ -2427,7 +2000,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 name,
                                 color,
                                 icon,
-                                localAsset,
+                                assetImg,
                                 imageUrl,
                               ),
                             ),
@@ -2489,18 +2062,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   ) {
     final lower = name.toLowerCase();
 
-    // Always do name-based asset lookup FIRST so known services never flash
     String assetPath = '';
     if (lower.contains('aadhaar')) assetPath = 'assets/Aadhaar.png';
     if (lower.contains('pan')) assetPath = 'assets/PAN.png';
     if (lower.contains('gst')) assetPath = 'assets/GST.png';
-    if (lower.contains('voter')) assetPath = 'assets/Voter.png';
+    if (lower.contains('voter')) assetPath = 'assets/Voter card.png';
     if (lower.contains('fastag')) assetPath = 'assets/Fastag.png';
     if (lower.contains('landline')) assetPath = 'assets/Landline.png';
     if (lower.contains('dth')) assetPath = 'assets/DTH.png';
     if (lower.contains('electricity')) assetPath = 'assets/Electricity.png';
     if (lower.contains('piped gas')) {
-      assetPath = 'assets/Piped Gas Bill.png';
+      assetPath = 'assets/Piped Gas Bill.jpg';
     } else if (lower.contains('gas') || lower.contains('cylinder')) {
       assetPath = 'assets/GAS.png';
     }
@@ -2512,12 +2084,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (lower.contains('broadband') || lower.contains('fiber')) assetPath = 'assets/Broadband.png';
     if (lower.contains('insurance') || lower.contains('premium')) assetPath = 'assets/Insurance premium.png';
     if (lower.contains('money') || lower.contains('transfer')) assetPath = 'assets/Money Transfer.png';
-    if (lower.contains('municipal') || lower.contains('tax')) assetPath = 'assets/Muncipal Taxes.png';
     if (lower.contains('recharge') || lower.contains('postpaid') || lower.contains('mobile')) {
       assetPath = 'assets/Postpaid Mobile Recharges.png';
     }
 
-    // Fall back to the localAsset provided by the service data
     if (assetPath.isEmpty && localAsset.isNotEmpty) {
       assetPath = localAsset;
     }
@@ -2529,70 +2099,56 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         height: double.infinity,
         fit: BoxFit.contain,
         errorBuilder: (c, e, s) {
-          // If asset fails, try a network URL before showing icon
           if (imageUrl.isNotEmpty) {
             return Image.network(
               imageUrl,
               width: double.infinity,
               height: double.infinity,
               fit: BoxFit.contain,
-              errorBuilder: (c2, e2, s2) => _buildFallbackIconBadge(icon, color),
+              errorBuilder: (c2, e2, s2) => Icon(icon, color: color, size: 50),
             );
           }
-          return _buildFallbackIconBadge(icon, color);
+          return Icon(icon, color: color, size: 50);
         },
       );
     }
 
-    // Only use network as last resort (no loadingBuilder flash)
     if (imageUrl.isNotEmpty) {
       return Image.network(
         imageUrl,
         width: double.infinity,
         height: double.infinity,
         fit: BoxFit.contain,
-        errorBuilder: (c, e, s2) => _buildFallbackIconBadge(icon, color),
+        errorBuilder: (c, e, s2) => Icon(icon, color: color, size: 50),
       );
     }
 
-    return _buildFallbackIconBadge(icon, color);
-  }
-
-  Widget _buildFallbackIconBadge(IconData icon, Color color) {
     return Icon(icon, color: color, size: 50);
   }
 
-  
-
-  // ==================== WHY CHOOSE US ====================
+  // ==================== WHY CHOOSE US WITH SMOOTH SCROLL ENTRANCE ====================
   Widget _buildWhyChooseUs() {
     final List<Map<String, dynamic>> items = [
       {
         'icon': Icons.rocket_launch_rounded,
         'title': 'Fast Processing',
         'subtitle': 'Experience seamless, instant updates.',
-        'colors': [
-          const Color(0xFF2DD4BF),
-          const Color(0xFF06B6D4),
-        ],
+        'fromLeft': true,
+        'colors': [const Color(0xFF2DD4BF), const Color(0xFF06B6D4)],
       },
       {
         'icon': Icons.shield_rounded,
         'title': '100% Secure',
         'subtitle': 'Bank-grade encryption for your data.',
-        'colors': [
-          const Color(0xFF3B82F6),
-          const Color(0xFF8B5CF6),
-        ],
+        'fromLeft': false,
+        'colors': [const Color(0xFF3B82F6), const Color(0xFF8B5CF6)],
       },
       {
         'icon': Icons.verified_user_rounded,
         'title': 'Trusted Partner',
         'subtitle': 'Millions of satisfied customers nationwide.',
-        'colors': [
-          const Color.fromARGB(255, 209, 73, 112),
-          const Color.fromARGB(255, 185, 44, 133),
-        ],
+        'fromLeft': true,
+        'colors': [const Color.fromARGB(255, 209, 73, 112), const Color.fromARGB(255, 185, 44, 133)],
       },
     ];
 
@@ -2601,67 +2157,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       child: Column(
         children: items.map((item) {
           final List<Color> colors = item['colors'] as List<Color>;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: colors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          final bool fromLeft = item['fromLeft'] as bool;
+
+          return _ScrollEntranceCard(
+            scrollController: _homeScrollController,
+            fromLeft: fromLeft,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: colors,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors[0].withValues(alpha: 0.35),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
-              borderRadius: BorderRadius.circular(22),
-              boxShadow: [
-                BoxShadow(
-                  color: colors[0].withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['title'] as String,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.2,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item['title'] as String,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        item['subtitle'] as String,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.92),
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
+                        const SizedBox(height: 6),
+                        Text(
+                          item['subtitle'] as String,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    shape: BoxShape.circle,
+                  const SizedBox(width: 14),
+                  Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      item['icon'] as IconData,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
-                  child: Icon(
-                    item['icon'] as IconData,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }).toList(),
@@ -2669,36 +2231,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-
-  // ==================== STATS CARDS (DISNEY / ALPONA CARD STYLE) ====================
+  // ==================== STATS CARDS ====================
   Widget _buildStatsWithAnimation() {
     final List<Map<String, dynamic>> stats = [
       {
         'title': 'Active Users',
         'subtitle': '10L+ Verified Users',
         'image': 'assets/stats_active_users.jpg',
-        'bannerColor': const Color(0xFFECE9FE), // Soft Lavender
+        'bannerColor': const Color(0xFFECE9FE),
         'textColor': const Color(0xFF4C1D95),
       },
       {
         'title': 'Pan India',
         'subtitle': '28 States & UTs',
         'image': 'assets/stats_pan_india.jpg',
-        'bannerColor': const Color(0xFFE0F2FE), // Soft Sky Blue
+        'bannerColor': const Color(0xFFE0F2FE),
         'textColor': const Color(0xFF0369A1),
       },
       {
         'title': 'Online Help',
         'subtitle': '24/7 Dedicated Desk',
         'image': 'assets/stats_online_help.jpg',
-        'bannerColor': const Color(0xFFDCFCE7), // Soft Mint
+        'bannerColor': const Color(0xFFDCFCE7),
         'textColor': const Color(0xFF15803D),
       },
       {
         'title': 'Encrypted',
         'subtitle': '100% Bank Grade',
         'image': 'assets/stats_encrypted.jpg',
-        'bannerColor': const Color(0xFFFEF3C7), // Soft Amber
+        'bannerColor': const Color(0xFFFEF3C7),
         'textColor': const Color(0xFFB45309),
       },
     ];
@@ -2739,13 +2300,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(24),
               child: Column(
                 children: [
-                  // Top 74% HD Image Section (Matching Screenshot 2 Disney/Alpona structure)
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF1F5F9),
-                      ),
+                      decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
                       child: Image.asset(
                         imagePath,
                         width: double.infinity,
@@ -2762,14 +2320,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-
-                  // Bottom 26% Pastel Banner Box (Matching Screenshot 2)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: bannerColor,
-                    ),
+                    decoration: BoxDecoration(color: bannerColor),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -2809,604 +2363,548 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  // ==================== POWERED BY SLIDER ====================
-  Widget _buildPoweredBySlider() {
-    final List<Map<String, dynamic>> logosData = [
-      {
-        'path': 'assets/AePS logo.png',
-        'width': 100.0,
-        'height': 45.0,
-        'paddingRight': 30.0, // Space more between AePS and utipan
-      },
-      {
-        'path': 'assets/utipan.png',
-        'width': 110.0,
-        'height': 45.0,
-        'paddingRight': 20.0,
-      },
-      {
-        'path': 'assets/LIC.png',
-        'width': 130.0, // Increased size for LIC
-        'height': 55.0, // Increased size for LIC
-        'paddingRight': 20.0,
-      },
-      {
-        'path': 'assets/Digital India.png',
-        'width': 110.0,
-        'height': 45.0,
-        'paddingRight': 20.0,
-      },
-      {
-        'path': 'assets/Bharat BillPay.png',
-        'width': 110.0,
-        'height': 45.0,
-        'paddingRight': 20.0,
-      },
-      {
-        'path': 'assets/NSDL.png',
-        'width': 130.0, // Increased size for NSDL
-        'height': 55.0, // Increased size for NSDL
-        'paddingRight': 20.0,
-      },
+  // ==================== POWERED BY PARTNER CAROUSEL (CLEAN & OPTIMIZED) ====================
+  Widget _buildPoweredByPlatform() {
+    final List<Map<String, String>> partners = [
+      {'name': 'LIC', 'asset': 'assets/LIC.png'},
+      {'name': 'NSDL', 'asset': 'assets/NSDL.png'},
+      {'name': 'AEPS', 'asset': 'assets/AePS logo.png'},
+      {'name': 'UTI', 'asset': 'assets/utipan.png'},
+      {'name': 'IRDAI', 'asset': 'assets/Insurance premium.png'},
+      {'name': 'Digital India', 'asset': 'assets/Digital India.png'},
+      {'name': 'Bharat BillPay', 'asset': 'assets/Bharat BillPay.png'},
     ];
 
-    // Calculate total width of one set of logos for accurate marquee offset
-    final double totalWidth = logosData.fold(0.0, (sum, item) => sum + item['width'] + item['paddingRight']);
+    const double cardWidth = 105.0;
+    const double cardSpacing = 12.0;
+    final double singleSetWidth = partners.length * (cardWidth + cardSpacing);
 
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 4,
-              height: 18,
+    return RepaintBoundary(
+      child: Column(
+        children: [
+          // ⚡ Powered By Pill Badge
+          Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFE8733F), Color(0xFFE23E7B)], // Amber to Rose
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(3),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0xFFE9D5FF)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                    blurRadius: 14,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              'Powered By',
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF161A3A), // Dark text for light background
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 70, // Increased height slightly to accommodate larger logos
-          child: AnimatedBuilder(
-            animation: _marqueeController,
-            builder: (context, child) {
-              final double offset = -(_marqueeController.value * totalWidth);
-              return Stack(
-                children: [
-                  Positioned(
-                    left: offset,
-                    top: 0,
-                    bottom: 0,
-                    child: Row(
-                      children: [
-                        ...logosData,
-                        ...logosData,
-                        ...logosData,
-                      ].map((item) {
-                        return Container(
-                          width: item['width'] + item['paddingRight'],
-                          padding: EdgeInsets.only(right: item['paddingRight']),
-                          alignment: Alignment.center,
-                          child: Image.asset(
-                            item['path'],
-                            height: item['height'],
-                            width: item['width'],
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.image_not_supported, color: Colors.grey);
-                            },
-                          ),
-                        );
-                      }).toList(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.bolt_rounded, color: Color(0xFF7C3AED), size: 18),
+                  SizedBox(width: 6),
+                  Text(
+                    'Powered By',
+                    style: TextStyle(
+                      color: Color(0xFF5F33E1),
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
                     ),
                   ),
                 ],
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ==================== IMAGE-2 EXACT CUSTOMER REVIEWS SLIDER ====================
-  Widget _buildTestimonialsCarousel() {
-    final List<Map<String, dynamic>> list = [
-      {
-        'n': 'Guy Hawkins',
-        'handle': '@guyhawkins',
-        'r': 'Impressed by the professionalism and attention to detail.',
-        'asset': 'assets/Priya.png',
-      },
-      {
-        'n': 'Karla Lynn',
-        'handle': '@karlalynn98',
-        'r': 'A seamless experience from start to finish. Highly recommend!',
-        'asset': 'assets/Sneha.png',
-      },
-      {
-        'n': 'Jane Cooper',
-        'handle': '@janecooper',
-        'r': 'Reliable and trustworthy. Made my life so much easier!',
-        'asset': 'assets/Deepa.png',
-      },
-      {
-        'n': 'Amit Patel',
-        'handle': '@amitpatel',
-        'r': 'Most reliable platform for all my business documentation and tax needs.',
-        'asset': 'assets/Amit.png',
-      },
-      {
-        'n': 'Vikram Rao',
-        'handle': '@vikramrao',
-        'r': 'ITR filing was effortless. Professional team with deep expertise.',
-        'asset': 'assets/Vikram.png',
-      },
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('Customer Reviews'),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 225,
-          child: PageView.builder(
-            controller: _reviewController,
-            itemCount: list.length,
-            onPageChanged: (index) => setState(() => _currentReview = index),
-            physics: const BouncingScrollPhysics(),
-            itemBuilder: (context, index) {
-              final t = list[index];
-              final String name = t['n'] as String;
-              final String handle = t['handle'] as String;
-              final String review = t['r'] as String;
-              final String assetPath = t['asset'] as String;
-
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0x14161A3A), width: 1.0),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 14,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Quotes Icon and Stars at Top
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.format_quote_rounded,
-                          color: Color(0xFFCBD5E1),
-                          size: 40,
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: List.generate(
-                            3,
-                            (index) => const Icon(
-                              Icons.star_rounded,
-                              color: Color.fromARGB(255, 246, 185, 2),
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    // Review Body Text
-                    Expanded(
-                      child: Text(
-                        review,
-                        style: const TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF0F172A),
-                          height: 1.4,
-                          letterSpacing: -0.2,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Bottom Profile Notch / Handle Row
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFFE2E8F0),
-                          child: ClipOval(
-                            child: Image.asset(
-                              assetPath,
-                              width: 36,
-                              height: 36,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.person_rounded,
-                                  color: Color(0xFF64748B),
-                                  size: 22,
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              name,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0F172A),
-                              ),
-                            ),
-                            Text(
-                              handle,
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF64748B),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 14),
-        // Indicator Dots (Image 2 style)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(list.length, (index) {
-            final isSelected = _currentReview == index;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: isSelected ? 22 : 7,
-              height: 5,
-              decoration: BoxDecoration(
-                color: isSelected ? kAccentPink : kFieldColor,
-                borderRadius: BorderRadius.circular(3),
               ),
-            );
-          }),
-        ),
-      ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Smooth Continuous Automatic Horizontal Slider
+          SizedBox(
+            height: 100,
+            child: AnimatedBuilder(
+              animation: _partnerMarqueeController,
+              builder: (context, child) {
+                final double offset = -(_partnerMarqueeController.value * singleSetWidth);
+                return ClipRect(
+                  child: Stack(
+                    children: [
+                      Positioned(
+                        left: offset,
+                        top: 0,
+                        bottom: 0,
+                        child: Row(
+                          children: [
+                            ...partners,
+                            ...partners,
+                            ...partners,
+                            ...partners,
+                          ].map((p) {
+                            return Container(
+                              width: cardWidth,
+                              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFF1F5F9), width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    child: Image.asset(
+                                      p['asset']!,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (c, e, s) => const Icon(Icons.verified_user_rounded, color: Color(0xFF7C3AED), size: 26),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    p['name']!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF1E1B4B),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ==================== MODERN HORIZONTAL NEED ASSISTANCE CARD ====================
+  // ==================== ASSISTANCE CTA SECTION (MODERN 3D REDESIGN) ====================
   Widget _buildContactCTA() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.all(26),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFF9F4), Color(0xFFFFEADA)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0x28E8733F),
-            width: 1,
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x141E1B4B),
-              blurRadius: 30,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              right: -60,
-              top: -80,
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: const BoxDecoration(
-                  gradient: RadialGradient(
-                    colors: [Color(0x38E8733F), Colors.transparent],
-                    stops: [0.0, 0.7],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0x4CE8733F)),
-                  ),
-                  child: const Text(
-                    '24/7 SUPPORT',
-                    style: TextStyle(
-                      color: Color(0xFFE8733F),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Left Titles & Subtitle, Right 3D Headset Illustration (Call ful.png)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Need Assistance?',
+                      'Need',
                       style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
                         color: Color(0xFF161A3A),
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        height: 1.1,
                       ),
                     ),
-                
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [Color(0xFF7C3AED), Color(0xFFEC4899)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(bounds),
+                      child: const Text(
+                        'Assistance?',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                          height: 1.15,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'We’re here to help you\n24/7 anytime, anywhere!',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                        height: 1.38,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Our care team is online to guide you with any service query.',
-                  style: TextStyle(
-                    color: Color(0xFF5B5E82),
-                    fontSize: 13,
-                    height: 1.5,
+              ),
+              const SizedBox(width: 8),
+              // High Quality 3D Headset Artwork with Floating Animation
+              AnimatedBuilder(
+                animation: _floatAnimationController,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(0, -6 * _floatAnimationController.value),
+                    child: child,
+                  );
+                },
+                child: Image.asset(
+                  'assets/Call ful.png',
+                  width: 145,
+                  height: 135,
+                  fit: BoxFit.contain,
+                  errorBuilder: (c, e, s) => Container(
+                    width: 90,
+                    height: 90,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFEC4899)]),
+                    ),
+                    child: const Icon(Icons.headset_mic_rounded, color: Colors.white, size: 45),
                   ),
                 ),
-                const SizedBox(height: 20),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          // 3 Support Interactive Cards with 3D Animated Badges
+          _buildSupportCard(
+            title: 'Call Us',
+            subtitle: 'Speak with our support executive',
+            iconType: _SupportIconType.phone,
+            accentColor: const Color(0xFF7C3AED),
+            onTap: _handleCallSupport,
+          ),
+          const SizedBox(height: 12),
+          _buildSupportCard(
+            title: 'Live Chat',
+            subtitle: 'Chat live with our support team',
+            iconType: _SupportIconType.chat,
+            accentColor: const Color(0xFF10B981),
+            isOnline: true,
+            onTap: _handleChatSupport,
+          ),
+          const SizedBox(height: 12),
+          _buildSupportCard(
+            title: 'Email Support',
+            subtitle: 'Drop us an email and we’ll get back to you',
+            iconType: _SupportIconType.email,
+            accentColor: const Color(0xFF2563EB),
+            onTap: _handleEmailSupport,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSupportCard({
+    required String title,
+    required String subtitle,
+    required _SupportIconType iconType,
+    required Color accentColor,
+    required VoidCallback onTap,
+    bool isOnline = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFF1F5F9), width: 1.3),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E1B4B).withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                _build3DSupportIcon(iconType),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _horizontalContactBtn(
-                        Icons.phone_in_talk_rounded,
-                        'Call Us',
-                        true,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1E1B4B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (isOnline) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFA7F3D0)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Color(0x6610B981),
+                                          blurRadius: 4,
+                                          spreadRadius: 1,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'Online',
+                                    style: TextStyle(
+                                      color: Color(0xFF059669),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(width: 8),
-                      _horizontalContactBtn(
-                        Icons.chat_bubble_outline_rounded,
-                        'Live Chat',
-                        false,
-                      ),
-                      const SizedBox(width: 8),
-                      _horizontalContactBtn(
-                        Icons.email_outlined,
-                        'Email',
-                        false,
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: accentColor,
+                    size: 20,
+                  ),
+                ),
               ],
             ),
-            Positioned(
-              right: -2,
-              top: -2,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [kAccentPink, kAccentPurple],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33EC4899),
-                      spreadRadius: 8,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.headset_mic_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _horizontalContactBtn(IconData icon, String label, bool isPrimary) {
+  Widget _build3DSupportIcon(_SupportIconType type) {
+    List<Color> gradientColors;
+    Color glowColor;
+    Widget innerIcon;
+
+    switch (type) {
+      case _SupportIconType.phone:
+        gradientColors = const [Color(0xFF8B5CF6), Color(0xFF6D28D9)];
+        glowColor = const Color(0xFF7C3AED);
+        innerIcon = const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 26);
+        break;
+      case _SupportIconType.chat:
+        gradientColors = const [Color(0xFF34D399), Color(0xFF059669)];
+        glowColor = const Color(0xFF10B981);
+        innerIcon = const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 25);
+        break;
+      case _SupportIconType.email:
+        gradientColors = const [Color(0xFF60A5FA), Color(0xFF2563EB)];
+        glowColor = const Color(0xFF2563EB);
+        innerIcon = const Icon(Icons.mail_rounded, color: Colors.white, size: 25);
+        break;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      width: 56,
+      height: 56,
       decoration: BoxDecoration(
-        gradient: isPrimary
-            ? const LinearGradient(colors: [Color(0xFFE8733F), Color(0xFFFFAE72)])
-            : null,
-        color: isPrimary ? null : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isPrimary ? Colors.transparent : const Color(0x14161A3A),
+        gradient: LinearGradient(
+          colors: gradientColors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x141E1B4B),
-            blurRadius: 20,
-            offset: Offset(0, 5),
+            color: glowColor.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.25),
+            blurRadius: 2,
+            offset: const Offset(-2, -2),
           ),
         ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Icon(icon, color: isPrimary ? Colors.white : const Color(0xFF161A3A), size: 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: isPrimary ? Colors.white : const Color(0xFF161A3A),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ==================== BOTTOM NAVIGATION BAR (SCREENSHOT-MATCHING STYLE) ====================
-  Widget _buildBottomNav() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x14161A3A)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1F1E1B4B),
-            blurRadius: 20,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Expanded(child: _buildNavItem(0, Icons.home_rounded, Icons.home_outlined, 'Home')),
-              Expanded(child: _buildNavItem(1, Icons.grid_view_rounded, Icons.grid_view, 'Services')),
-              Expanded(child: _buildNavItem(2, Icons.assignment_rounded, Icons.assignment_outlined, 'Orders')),
-              Expanded(child: _buildNavItem(3, Icons.person_rounded, Icons.person_outline_rounded, 'Profile')),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData activeIcon, IconData inactiveIcon, String label) {
-    final isSelected = _selectedIndex == index;
-
-    return InkWell(
-      onTap: () {
-        if (_selectedIndex != index) {
-          setState(() => _selectedIndex = index);
-        }
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: isSelected
-              ? const LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFFF4B91)]) // Purple to Pink
-              : null,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: isSelected
-              ? [BoxShadow(color: const Color(0xFF8B3DFF).withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(0, 4))]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSelected ? activeIcon : inactiveIcon,
-              color: isSelected ? Colors.white : const Color(0xFF64748B),
-              size: 18,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              softWrap: false,
-              style: TextStyle(
-                color: isSelected ? Colors.white : const Color(0xFF64748B),
-                fontSize: 9.5,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+          // Specular light gloss shine at top-left
+          Positioned(
+            top: 3,
+            left: 5,
+            child: Container(
+              width: 22,
+              height: 12,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.45),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          innerIcon,
+        ],
       ),
     );
   }
 }
 
-// ==================== CUSTOM CLIPPER FOR TOP CURVED HEADER (MATCHING SCREENSHOT) ====================
-class HeaderCurveClipper extends CustomClipper<Path> {
+// ==================== SCROLL-BASED ENTRANCE ANIMATION WRAPPER ====================
+class _ScrollEntranceCard extends StatefulWidget {
+  final ScrollController scrollController;
+  final bool fromLeft;
+  final Widget child;
+
+  const _ScrollEntranceCard({
+    required this.scrollController,
+    required this.fromLeft,
+    required this.child,
+  });
+
   @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.lineTo(0, size.height - 65);
-    final firstControlPoint = Offset(size.width * 0.28, size.height + 15);
-    final firstEndPoint = Offset(size.width * 0.65, size.height - 35);
-    path.quadraticBezierTo(
-      firstControlPoint.dx,
-      firstControlPoint.dy,
-      firstEndPoint.dx,
-      firstEndPoint.dy,
+  State<_ScrollEntranceCard> createState() => _ScrollEntranceCardState();
+}
+
+class _ScrollEntranceCardState extends State<_ScrollEntranceCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<Offset> _slideAnim;
+  late Animation<double> _fadeAnim;
+  bool _isInViewport = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
     );
-    final secondControlPoint = Offset(size.width * 0.88, size.height - 75);
-    final secondEndPoint = Offset(size.width, size.height - 25);
-    path.quadraticBezierTo(
-      secondControlPoint.dx,
-      secondControlPoint.dy,
-      secondEndPoint.dx,
-      secondEndPoint.dy,
+
+    final beginOffset = widget.fromLeft ? const Offset(-0.35, 0.0) : const Offset(0.35, 0.0);
+    _slideAnim = Tween<Offset>(begin: beginOffset, end: Offset.zero).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+    );
+
+    widget.scrollController.addListener(_checkVisibility);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkVisibility());
+  }
+
+  void _checkVisibility() {
+    if (!mounted) return;
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox != null && renderBox.hasSize && renderBox.attached) {
+      final position = renderBox.localToGlobal(Offset.zero);
+      final screenHeight = MediaQuery.of(context).size.height;
+      final cardTop = position.dy;
+      final cardBottom = position.dy + renderBox.size.height;
+
+      final isVisible = cardTop < (screenHeight - 30) && cardBottom > 20;
+
+      if (isVisible) {
+        if (!_isInViewport) {
+          _isInViewport = true;
+          _animController.forward(from: 0.0);
+        }
+      } else {
+        if (_isInViewport) {
+          _isInViewport = false;
+          _animController.reset();
+        }
+      }
+    }
   }
 
   @override
-  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
+  void dispose() {
+    widget.scrollController.removeListener(_checkVisibility);
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SlideTransition(
+      position: _slideAnim,
+      child: FadeTransition(
+        opacity: _fadeAnim,
+        child: widget.child,
+      ),
+    );
+  }
 }
+
+enum _SupportIconType {
+  phone,
+  chat,
+  email,
+}
+
+

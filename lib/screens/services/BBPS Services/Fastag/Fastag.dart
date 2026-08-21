@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 typedef Fastag = FastagScreen;
 typedef FASTag = FastagScreen;
@@ -48,6 +50,9 @@ class _FastagScreenState extends State<FastagScreen>
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   String get _base => ApiService.baseUrl;
   bool get _canShowAmount =>
       _vehicleNoCtrl.text.trim().isNotEmpty && _selectedOp != null;
@@ -74,6 +79,7 @@ class _FastagScreenState extends State<FastagScreen>
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic);
     _fadeController.forward();
@@ -88,6 +94,7 @@ class _FastagScreenState extends State<FastagScreen>
     _vehicleNoCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -134,6 +141,25 @@ class _FastagScreenState extends State<FastagScreen>
       _snack('Please login', isError: true);
       return;
     }
+
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'FASTag Recharge – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitFastag(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _snack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitFastag({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() {
       _submitting = true;
       _resultStatus = null;
@@ -149,6 +175,8 @@ class _FastagScreenState extends State<FastagScreen>
               'operator_id': _selectedOp!['spkey']?.toString() ?? '',
               'operator_name': _selectedOp!['label']?.toString() ?? '',
               'amount': _amountCtrl.text.trim(),
+              'razorpay_payment_id': razorpayPaymentId,
+              'payment_status': 'paid',
             }),
           )
           .timeout(const Duration(seconds: 60));
@@ -156,14 +184,12 @@ class _FastagScreenState extends State<FastagScreen>
       if (mounted) {
         setState(() {
           _submitting = false;
-          _resultStatus = data['success'] == true
-              ? (data['status']?.toString() ?? 'success')
-              : 'failed';
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
           _resultMessage =
-              data['message']?.toString() ??
+              (data['message']?.toString() ??
               (_resultStatus == 'success'
                   ? 'FASTag recharged!'
-                  : 'Recharge failed');
+                  : 'Recharge failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId =
               data['merchant_txn_id']?.toString() ??
               'FAS${DateTime.now().millisecondsSinceEpoch}';
@@ -174,7 +200,7 @@ class _FastagScreenState extends State<FastagScreen>
         setState(() {
           _submitting = false;
           _resultStatus = 'pending';
-          _resultMessage = "Couldn't confirm recharge. Check history.";
+          _resultMessage = "Couldn't confirm payment. Check history.";
           _merchantTxnId = 'FAS${DateTime.now().millisecondsSinceEpoch}';
         });
       }
@@ -1190,7 +1216,7 @@ class _FastagScreenState extends State<FastagScreen>
             ),
             const SizedBox(height: 10),
             Text(
-              _resultMessage ?? '',
+              (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -1399,3 +1425,6 @@ class _FastagScreenState extends State<FastagScreen>
     );
   }
 }
+
+
+

@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 typedef Landline = LandlineScreen;
 
@@ -47,6 +49,9 @@ class _LandlineScreenState extends State<LandlineScreen>
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   bool get _canShowAmount =>
       _landlineCtrl.text.trim().isNotEmpty && _selectedOp != null;
 
@@ -70,6 +75,7 @@ class _LandlineScreenState extends State<LandlineScreen>
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fadeController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
     _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic);
     _fadeController.forward();
@@ -84,6 +90,7 @@ class _LandlineScreenState extends State<LandlineScreen>
     _stdCodeCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -138,31 +145,50 @@ class _LandlineScreenState extends State<LandlineScreen>
       _snack('Please login', isError: true);
       return;
     }
+
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'Landline Bill – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitLandline(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _snack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitLandline({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() {
       _submitting = true;
       _resultStatus = null;
     });
     try {
       final res = await ApiService.postApi('/landline/pay', {
-        'user_id': auth.userId,
-        'landline_number': _landlineCtrl.text.trim(),
-        'std_code': _stdCodeCtrl.text.trim(),
-        'operator_id': _selectedOp!['spkey']?.toString() ?? '',
-        'operator_name': _selectedOp!['label']?.toString() ?? '',
-        'amount': _amountCtrl.text.trim(),
+        'user_id':             auth.userId,
+        'landline_number':     _landlineCtrl.text.trim(),
+        'std_code':            _stdCodeCtrl.text.trim(),
+        'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
+        'operator_name':       _selectedOp!['label']?.toString() ?? '',
+        'amount':              _amountCtrl.text.trim(),
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status':      'paid',
       });
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
           _submitting = false;
-          _resultStatus = data['success'] == true
-              ? (data['status']?.toString() ?? 'success')
-              : 'failed';
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
           _resultMessage =
-              data['message']?.toString() ??
+              (data['message']?.toString() ??
               (_resultStatus == 'success'
                   ? 'Landline bill paid!'
-                  : 'Payment failed');
+                  : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId =
               data['merchant_txn_id']?.toString() ??
               'LL${DateTime.now().millisecondsSinceEpoch}';
@@ -1200,7 +1226,7 @@ class _LandlineScreenState extends State<LandlineScreen>
             ),
             const SizedBox(height: 10),
             Text(
-              _resultMessage ?? '',
+              (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -1410,3 +1436,6 @@ class _LandlineScreenState extends State<LandlineScreen>
     );
   }
 }
+
+
+

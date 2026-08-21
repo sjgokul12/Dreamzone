@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 class RechargeScreen extends StatefulWidget {
   final bool initialIsPostpaid;
@@ -41,9 +43,13 @@ class _RechargeScreenState extends State<RechargeScreen> {
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _isPostpaid = widget.initialIsPostpaid;
     _fetchData();
   }
@@ -109,6 +115,7 @@ class _RechargeScreenState extends State<RechargeScreen> {
   void dispose() {
     _mobileCtrl.dispose();
     _amountCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -133,6 +140,25 @@ class _RechargeScreenState extends State<RechargeScreen> {
       return;
     }
 
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: '${_isPostpaid ? "Postpaid" : "Prepaid"} Recharge – $_selectedOperator',
+      name: 'DZI Infinity',
+      contact: _mobileCtrl.text.replaceAll('+91 ', '').trim(),
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitRecharge(auth: auth, opData: opData, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _showSnack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitRecharge({required dynamic auth, required dynamic opData, required String razorpayPaymentId}) async {
     setState(() {
       _submitting = true;
       _resultStatus = null;
@@ -141,13 +167,15 @@ class _RechargeScreenState extends State<RechargeScreen> {
     try {
       // Using ApiService.postApi to fallback to localhost properly
       final res = await ApiService.postApi('/recharge', {
-        'user_id': auth.userId,
-        'mobile_number': _mobileCtrl.text.trim().replaceAll('+91 ', '').trim(),
-        'operator_id': opData['id'],
-        'operator_name': _selectedOperator,
-        'circle': _selectedCircle == 'Select circle' ? '' : _selectedCircle,
-        'amount': _amountCtrl.text.trim(),
-        'type': _isPostpaid ? 'postpaid' : 'prepaid',
+        'user_id':             auth.userId,
+        'mobile_number':       _mobileCtrl.text.trim().replaceAll('+91 ', '').trim(),
+        'operator_id':         opData['id'],
+        'operator_name':       _selectedOperator,
+        'circle':              _selectedCircle == 'Select circle' ? '' : _selectedCircle,
+        'amount':              _amountCtrl.text.trim(),
+        'type':                _isPostpaid ? 'postpaid' : 'prepaid',
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status':      'paid',
       }, timeoutSeconds: 30);
 
       final data = jsonDecode(res.body);
@@ -155,7 +183,7 @@ class _RechargeScreenState extends State<RechargeScreen> {
         setState(() {
           _submitting = false;
           _resultStatus = data['success'] == true ? 'success' : 'failed';
-          _resultMessage = data['message'] ?? (_resultStatus == 'success' ? 'Recharge successful!' : 'Recharge failed');
+          _resultMessage = (data['message'] ?? (_resultStatus == 'success' ? 'Recharge successful!' : 'Recharge failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id'] ?? 'TXN-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}';
         });
       }
@@ -757,7 +785,7 @@ class _RechargeScreenState extends State<RechargeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _resultMessage ?? '',
+            (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
             textAlign: TextAlign.center,
             style: const TextStyle(color: textSubdued, fontSize: 14),
           ),
@@ -803,3 +831,6 @@ class _RechargeScreenState extends State<RechargeScreen> {
     );
   }
 }
+
+
+

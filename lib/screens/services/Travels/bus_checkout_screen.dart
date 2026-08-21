@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../services/bus_api_service.dart';
+import '../../../core/payment/razorpay_service.dart';
 
 class BusCheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> busDetails;
@@ -44,8 +46,17 @@ class _BusCheckoutScreenState extends State<BusCheckoutScreen> {
   String? _selectedDroppingPoint;
   bool _isLoading = false;
 
+  final RazorpayService _razorpayService = RazorpayService();
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpayService.init();
+  }
+
   @override
   void dispose() {
+    _razorpayService.dispose();
     _nameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -71,6 +82,28 @@ class _BusCheckoutScreenState extends State<BusCheckoutScreen> {
       return;
     }
 
+    double totalFare = widget.selectedSeats.fold(0, (sum, seat) => sum + ((seat['totalFareWithTaxes'] ?? seat['fare']) as num).toDouble());
+
+    _razorpayService.openPaymentGateway(
+      amount: totalFare,
+      description: 'Bus Ticket: ${widget.sourceCity} to ${widget.destinationCity}',
+      name: 'DZI Infinity',
+      contact: _phoneController.text.trim(),
+      email: _emailController.text.trim(),
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitBooking(razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment failed: ${response.message ?? "Unknown error"}')),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitBooking({required String razorpayPaymentId}) async {
     setState(() => _isLoading = true);
 
     try {
@@ -115,7 +148,9 @@ class _BusCheckoutScreenState extends State<BusCheckoutScreen> {
         "customerAddress": _addressController.text.trim(),
         "boardingPoint": bp,
         "droppingPoint": dp,
-        "blockSeatPaxDetails": paxDetails
+        "blockSeatPaxDetails": paxDetails,
+        "razorpayPaymentId": razorpayPaymentId,
+        "paymentStatus": "paid",
       };
 
       // 1. Block Ticket

@@ -337,7 +337,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
   bool _isGasCylinderService(Map<String, dynamic> service) {
     final name = (service['name'] ?? '').toString().toLowerCase();
     final category = (service['category'] ?? '').toString().toLowerCase();
-    return name.contains('cylinder') || category.contains('cylinder') || name.contains('lpg');
+    return name.contains('gas') || name.contains('cylinder') || category.contains('gas') || category.contains('cylinder') || name.contains('lpg');
   }
 
   bool _isRechargeService(Map<String, dynamic> service) {
@@ -1389,6 +1389,10 @@ class _AllServicesScreenState extends State<AllServicesScreen> {
       targetScreen = FssaiServiceScreen(service: service, isGuest: widget.isGuest);
     } else if (sName.contains('passport')) {
       targetScreen = PassportServiceScreen(service: service, isGuest: widget.isGuest, preselectedSectionId: section?['id'] as int?, preselectedSectionData: section);
+    } else if (sName.contains('gas') || sName.contains('cylinder') || sName.contains('piped gas') || sName.contains('lpg')) {
+      targetScreen = const GasCylinderScreen();
+    } else if (sName.contains('money') || sName.contains('transfer') || sName.contains('remitter') || sName.contains('dmt')) {
+      targetScreen = const MoneyTransferScreen();
     } else {
       targetScreen = ServiceDetailScreen(service: service, isGuest: widget.isGuest);
     }

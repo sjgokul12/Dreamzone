@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 /// Convenient alias so both `Electricity` and `ElectricityScreen` can be used.
 typedef Electricity = ElectricityScreen;
@@ -54,6 +56,9 @@ class _ElectricityScreenState extends State<ElectricityScreen>
   String? _resultStatus;   // 'success' | 'failed' | 'pending'
   String? _resultMessage;
   String? _merchantTxnId;
+
+  // ─── Razorpay Service ─────────────────────────────────────────────────────
+  final RazorpayService _razorpayService = RazorpayService();
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
   String get _base => ApiService.baseUrl;
@@ -112,6 +117,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fetchOperators();
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.toLowerCase());
@@ -120,6 +126,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
 
   @override
   void dispose() {
+    _razorpayService.dispose();
     _subscriptionIdCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
@@ -171,26 +178,45 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       return;
     }
 
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    // Open Razorpay first; backend API called only on payment success
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'Electricity Bill – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitElectricityBill(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _showSnackBar('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitElectricityBill({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() { _submitting = true; _resultStatus = null; });
 
     try {
       final res = await ApiService.postApi('/electricity/pay', {
-        'user_id':       auth.userId,
-        'ca_number':     _subscriptionIdCtrl.text.trim(),
-        'operator_id':   _selectedOp!['spkey']?.toString() ?? _selectedOp!['id']?.toString() ?? '',
-        'operator_name': _selectedOp!['label']?.toString() ?? _selectedOp!['name']?.toString() ?? '',
-        'amount':        _amountCtrl.text.trim(),
+        'user_id':             auth.userId,
+        'ca_number':           _subscriptionIdCtrl.text.trim(),
+        'operator_id':         _selectedOp!['spkey']?.toString() ?? _selectedOp!['id']?.toString() ?? '',
+        'operator_name':       _selectedOp!['label']?.toString() ?? _selectedOp!['name']?.toString() ?? '',
+        'amount':              _amountCtrl.text.trim(),
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status':      'paid',
       });
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
           _submitting    = false;
-          _resultStatus  = data['success'] == true
-              ? (data['status']?.toString() ?? 'success')
-              : 'failed';
-          _resultMessage = data['message']?.toString() ??
-              (_resultStatus == 'success' ? 'Bill paid!' : 'Payment failed');
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultMessage = (data['message']?.toString() ??
+              (_resultStatus == 'success' ? 'Bill paid!' : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id']?.toString() ??
               'ELEC${DateTime.now().millisecondsSinceEpoch}';
         });
@@ -1057,7 +1083,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
           Text(title, style: TextStyle(fontSize: 22,
               fontWeight: FontWeight.w900, color: sc)),
           const SizedBox(height: 10),
-          Text(_resultMessage ?? '', textAlign: TextAlign.center,
+          Text((_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(), textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: textMuted, height: 1.5)),
           const SizedBox(height: 22),
           Container(

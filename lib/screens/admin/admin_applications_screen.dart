@@ -551,7 +551,10 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                     color: Colors.grey[700],
                                   ),
                                 ),
-                                Row(
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Text(
                                       a['tracking_id'] ?? 'N/A',
@@ -560,7 +563,6 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                         color: Colors.grey[500],
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
                                     statusChip(a['status']),
                                   ],
                                 ),
@@ -724,8 +726,11 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                   ],
 
                                   // Documents
-                                  _sectionHeader('Documents'),
-                                  Row(
+                                  _sectionHeader('Documents & Actions'),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
                                       OutlinedButton.icon(
                                         onPressed: () => _viewFiles(a['id']),
@@ -733,7 +738,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                           Icons.folder_open,
                                           size: 16,
                                         ),
-                                        label: Text('View Files'),
+                                        label: const Text('View Files'),
                                         style: OutlinedButton.styleFrom(
                                           foregroundColor: const Color(
                                             0xFF1A237E,
@@ -743,8 +748,6 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                                           ),
                                         ),
                                       ),
-                                      const Spacer(),
-                                      // Status Update Buttons
                                       if (a['status'] == 'pending')
                                         _statusActionButton(
                                           'Process',

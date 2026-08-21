@@ -3,8 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:dreamzoneapp/providers/auth_provider.dart';
 import 'package:dreamzoneapp/services/api_service.dart';
+import 'package:dreamzoneapp/core/payment/razorpay_service.dart';
+
+// Premium Palette Theme Constants (Shared Globally in this file)
+const Color primaryPurple      = Color(0xFF5F33E1);
+const Color secondaryPurple    = Color(0xFF7C3AED);
+const Color textDarkHeading    = Color(0xFF1E1B4B);
+const Color textLabelDark      = Color(0xFF312E81);
+const Color textSubdued        = Color(0xFF6B7280);
+const Color bgCanvas           = Color(0xFFF5F3FF);
+const Color cardSurface        = Colors.white;
 
 class PassportServiceScreen extends StatefulWidget {
   final Map<String, dynamic> service;
@@ -28,10 +39,15 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final ApiService _api = ApiService();
+  final RazorpayService _razorpayService = RazorpayService();
   bool _submitted = false;
   bool _loading = false;
   String? _trackingId;
+  int _expandedSectionIndex = 0;
 
+  // Selected Passport Sub-Service Category: 0 = New Passport, 1 = Correction Passport, 2 = PCC
+  int _selectedCategory = 0;
+  
   // Selected Passport Sub-Service (1=Normal, 2=Tatkal, 3=Minor, 4=Correction Normal, 5=Correction Tatkal, 6=Lost/Damage, 7=PCC)
   late int _selectedSubService;
 
@@ -65,7 +81,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
   final TextEditingController _spouseNameController = TextEditingController();
   final TextEditingController _spouseInitialController = TextEditingController();
 
-  // 4. Address For Communication
+  // 3. Address For Communication
   final String _addressType = 'Address Per Application';
   final TextEditingController _houseNoController = TextEditingController();
   final TextEditingController _streetAreaController = TextEditingController();
@@ -85,22 +101,14 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
 
   // 5. Upload Document Bytes
   final Map<String, List<Map<String, dynamic>>> _uploadedDocs = {};
-  bool _unlockedDocuments = false;
 
   Map<String, dynamic>? _savedDetails;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Premium Teal Palette
-  static const Color primaryTeal = Color(0xFF00A896);
-  static const Color secondaryTeal = Color(0xFF0284C7);
-  static const Color headerGradientStart = Color(0xFF0F766E);
-  static const Color headerGradientEnd = Color(0xFF0284C7);
-  static const Color textDarkHeading = Color(0xFF0F172A);
-  static const Color textLabelDark = Color(0xFF1E293B);
-  static const Color textSubdued = Color(0xFF64748B);
-  static const Color bgCanvas = Color(0xFFF1F5F9);
-  static const Color cardSurface = Colors.white;
+  List<String> _maritalStatusList = ['Single', 'Married', 'Divorced', 'Widowed'];
+  List<String> _educationList = ['10th Pass and Above', 'Below 10th', 'Graduate & Above'];
+  List<String> _jobTypeList = ['Private', 'Government', 'Self Employed', 'Student', 'Other'];
 
   @override
   void initState() {
@@ -115,14 +123,62 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     );
     _animationController.forward();
 
-    _selectedSubService = widget.preselectedSectionId ?? 1;
+    // Map the preselected section to appropriate category and sub-service
+    final subId = widget.preselectedSectionId ?? 1;
+    _selectedSubService = subId;
+    if (subId >= 1 && subId <= 3) {
+      _selectedCategory = 0;
+    } else if (subId >= 4 && subId <= 6) {
+      _selectedCategory = 1;
+    } else if (subId == 7) {
+      _selectedCategory = 2;
+    }
+
     _loadSavedUserData();
     _fetchDropdownData();
+    _razorpayService.init();
   }
 
-  List<String> _maritalStatusList = ['Single', 'Married', 'Divorced', 'Widowed'];
-  List<String> _educationList = ['10th Pass and Above', 'Below 10th', 'Graduate & Above'];
-  List<String> _jobTypeList = ['Private', 'Government', 'Self Employed', 'Student', 'Other'];
+  @override
+  void dispose() {
+    _razorpayService.dispose();
+    _animationController.dispose();
+    _applicantNameController.dispose();
+    _initialFullFormController.dispose();
+    _birthPlaceController.dispose();
+    _birthDistrictController.dispose();
+    _dobController.dispose();
+    _panNoController.dispose();
+    _aadhaarNoController.dispose();
+    _mobileNumberController.dispose();
+    _emailIdController.dispose();
+    _existingPassportNoController.dispose();
+    _existingFileNoController.dispose();
+    _dateOfIssueController.dispose();
+    _dateOfExpController.dispose();
+    _fatherFirstNameController.dispose();
+    _fatherMiddleNameController.dispose();
+    _fatherLastNameController.dispose();
+    _motherFirstNameController.dispose();
+    _motherMiddleNameController.dispose();
+    _motherLastNameController.dispose();
+    _spouseNameController.dispose();
+    _spouseInitialController.dispose();
+    _houseNoController.dispose();
+    _streetAreaController.dispose();
+    _tehsilPostController.dispose();
+    _pincodeController.dispose();
+    _districtController.dispose();
+    _stateController.dispose();
+    _cityController.dispose();
+    _emergencyNameAddressController.dispose();
+    _emergencyMobileController.dispose();
+    _emergencyEmailController.dispose();
+    _kendraLocationController.dispose();
+    _appointmentDateController.dispose();
+    _policeStationController.dispose();
+    super.dispose();
+  }
 
   Future<void> _fetchDropdownData() async {
     try {
@@ -163,46 +219,6 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         }
       }
     } catch (_) {}
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    _applicantNameController.dispose();
-    _initialFullFormController.dispose();
-    _birthPlaceController.dispose();
-    _birthDistrictController.dispose();
-    _dobController.dispose();
-    _panNoController.dispose();
-    _aadhaarNoController.dispose();
-    _mobileNumberController.dispose();
-    _emailIdController.dispose();
-    _existingPassportNoController.dispose();
-    _existingFileNoController.dispose();
-    _dateOfIssueController.dispose();
-    _dateOfExpController.dispose();
-    _fatherFirstNameController.dispose();
-    _fatherMiddleNameController.dispose();
-    _fatherLastNameController.dispose();
-    _motherFirstNameController.dispose();
-    _motherMiddleNameController.dispose();
-    _motherLastNameController.dispose();
-    _spouseNameController.dispose();
-    _spouseInitialController.dispose();
-    _houseNoController.dispose();
-    _streetAreaController.dispose();
-    _tehsilPostController.dispose();
-    _pincodeController.dispose();
-    _districtController.dispose();
-    _stateController.dispose();
-    _cityController.dispose();
-    _emergencyNameAddressController.dispose();
-    _emergencyMobileController.dispose();
-    _emergencyEmailController.dispose();
-    _kendraLocationController.dispose();
-    _appointmentDateController.dispose();
-    _policeStationController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadSavedUserData() async {
@@ -261,7 +277,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
             Text('✨ Saved profile details applied!', style: TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
-        backgroundColor: primaryTeal,
+        backgroundColor: primaryPurple,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -269,13 +285,13 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
   }
 
   double get _payableAmount {
-    if (_selectedSubService == 7) return 500.00; // PCC
-    if (_selectedSubService == 6) return 3000.00; // Lost/Damage
-    if (_selectedSubService == 5) return 3500.00; // Correction Tatkal
-    if (_selectedSubService == 4) return 1500.00; // Correction Normal
-    if (_selectedSubService == 3) return 1000.00; // Minor
-    if (_selectedSubService == 2) return 3500.00; // Tatkal
-    return 1500.00; // Normal
+    if (_selectedSubService == 7) return 700.00;   // PCC
+    if (_selectedSubService == 6) return 5300.00;  // Lost/Damage
+    if (_selectedSubService == 5) return 5300.00;  // Correction Tatkal
+    if (_selectedSubService == 4) return 2700.00;  // Correction Normal
+    if (_selectedSubService == 3) return 1950.00;  // Minor
+    if (_selectedSubService == 2) return 5300.00;  // Tatkal
+    return 2700.00; // Normal
   }
 
   String get _serviceTitle {
@@ -295,6 +311,14 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
       default:
         return 'Normal Passport Application';
     }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return '0 KB';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   Future<void> _pickFile(String docKey) async {
@@ -317,17 +341,26 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
           return;
         }
 
+        final ext = (f.extension ?? f.name.split('.').last).toLowerCase();
+
         setState(() {
           _uploadedDocs[docKey] = [
             {
               'bytes': f.bytes,
               'name': f.name,
               'size': f.size,
+              'extension': ext,
             }
           ];
         });
       }
     } catch (_) {}
+  }
+
+  void _removeFile(String docKey) {
+    setState(() {
+      _uploadedDocs.remove(docKey);
+    });
   }
 
   Future<void> _submitPassportForm() async {
@@ -339,6 +372,31 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
       return;
     }
 
+    // Open Razorpay first; backend called only on payment success
+    _razorpayService.openPaymentGateway(
+      amount: _payableAmount,
+      description: _serviceTitle,
+      name: 'DZI Infinity',
+      contact: _mobileNumberController.text.trim(),
+      email: _emailIdController.text.trim(),
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitPassportForm(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Payment failed: ${response.message ?? "Unknown error"}'),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitPassportForm({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() => _loading = true);
 
     Map<String, String> formData = {
@@ -381,6 +439,9 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
       'passport_kendra_location': _kendraLocationController.text.trim(),
       'appointment_date': _appointmentDateController.text.trim(),
       'police_station': _policeStationController.text.trim(),
+      'amount': _payableAmount.toStringAsFixed(2),
+      'razorpay_payment_id': razorpayPaymentId,
+      'payment_status': 'paid',
     };
 
     try {
@@ -407,7 +468,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         }
       }
 
-      final response = await request.send().timeout(const Duration(seconds: 60));
+      final response = await request.send().timeout(const Duration(seconds: 45));
       final resBody = await response.stream.bytesToString();
       final data = jsonDecode(resBody);
 
@@ -456,381 +517,57 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     );
   }
 
-  Widget _buildFormBody(bool isDesktop, Size screenSize) {
-    double horizontalPadding = screenSize.width > 1100
-        ? (screenSize.width - 920) / 2
-        : (screenSize.width > 700 ? 24.0 : 12.0);
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: CustomScrollView(
-        slivers: [
-          // Top Curved Hero Container (Matching Screenshot 5 design!)
-          SliverToBoxAdapter(
+  Widget _buildTopNavBar() {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 8,
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
             child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 14,
-                bottom: 30,
-                left: 16,
-                right: 16,
-              ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [headerGradientStart, headerGradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(28),
-                  bottomRight: Radius.circular(28),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      const Spacer(),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: 68,
-                    height: 68,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(45),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 40),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _serviceTitle,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.4,
-                    ),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
+              child: const Icon(Icons.arrow_back, color: primaryPurple, size: 20),
             ),
           ),
-
-          // Main Form Content Card
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_savedDetails != null) ...[
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
-                          onPressed: _applySavedDetails,
-                          icon: const Icon(Icons.bolt, color: Colors.white, size: 16),
-                          label: const Text(
-                            'Auto-Fill Saved Profile',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryTeal,
-                            elevation: 1,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-
-                    Container(
-                      decoration: BoxDecoration(
-                        color: cardSurface,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(14),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // SECTION 1: Personal Information (Screenshots 1 & 3)
-                          _buildHeaderBanner('1. Personal Information'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (_selectedSubService >= 1 && _selectedSubService <= 3) ...[
-                                  _buildDropdownField('Application Type *', _selectedSubService == 1 ? 'Normal' : (_selectedSubService == 2 ? 'Tatkal' : 'Minor'), ['Normal', 'Tatkal', 'Minor'], (v) {
-                                    setState(() {
-                                      if (v == 'Normal') _selectedSubService = 1;
-                                      if (v == 'Tatkal') _selectedSubService = 2;
-                                      if (v == 'Minor') _selectedSubService = 3;
-                                    });
-                                  }),
-                                  const SizedBox(height: 14),
-                                ] else if (_selectedSubService >= 4 && _selectedSubService <= 6) ...[
-                                  _buildDropdownField('Application Type *', _selectedSubService == 4 ? '1st Correction' : (_selectedSubService == 5 ? 'Tatkal Correction' : 'Lost/Damage'), ['1st Correction', 'Tatkal Correction', 'Lost/Damage'], (v) {
-                                    setState(() {
-                                      if (v == '1st Correction') _selectedSubService = 4;
-                                      if (v == 'Tatkal Correction') _selectedSubService = 5;
-                                      if (v == 'Lost/Damage') _selectedSubService = 6;
-                                    });
-                                  }),
-                                  const SizedBox(height: 14),
-                                ],
-
-                                const Text('Applicant\'s Name *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading)),
-                                const SizedBox(height: 6),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Name', _applicantNameController, placeholder: 'NAME'),
-                                  _buildInput('Initial Full Form', _initialFullFormController, placeholder: 'INITIAL FULL FORM'),
-                                ),
-                                const SizedBox(height: 14),
-                                const Text('Birth Details *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading)),
-                                const SizedBox(height: 6),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Birth Place', _birthPlaceController, placeholder: 'BIRTH PLACE'),
-                                  _buildInput('Birth Place District', _birthDistrictController, placeholder: 'BIRTH PLACE DISTRICT'),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildDateField('Date of Birth *', _dobController),
-                                  _buildDropdownField('Marital Status *', _maritalStatus, _maritalStatusList, (v) => setState(() => _maritalStatus = v!)),
-                                ),
-                                if (_maritalStatus == 'Married') ...[
-                                  const SizedBox(height: 14),
-                                  _buildResponsiveRow(
-                                    context,
-                                    _buildInput('Spouse Name *', _spouseNameController, placeholder: 'SPOUSE NAME'),
-                                    _buildInput('Spouse Initial.Full Form', _spouseInitialController, placeholder: 'INITIAL FULL FORM'),
-                                  ),
-                                ],
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('PAN No. *', _panNoController, placeholder: 'PAN NO.'),
-                                  _buildInput('Aadhaar Number *', _aadhaarNoController, isNum: true, placeholder: 'AADHAAR NUMBER'),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildDropdownField('Educational Qualification *', _education, _educationList, (v) => setState(() => _education = v!)),
-                                  _buildDropdownField('Job Type *', _jobType, _jobTypeList, (v) => setState(() => _jobType = v!)),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER'),
-                                  _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID'),
-                                ),
-
-                                // Extra fields for Correction / Renewal / Lost (Screenshot 3)
-                                if (_selectedSubService >= 4 && _selectedSubService <= 6) ...[
-                                  const SizedBox(height: 16),
-                                  const Divider(color: Color(0xFFCBD5E1)),
-                                  const SizedBox(height: 10),
-                                  _buildInput('Existing Passport No *', _existingPassportNoController, placeholder: 'passport number'),
-                                  const SizedBox(height: 12),
-                                  _buildResponsiveRow(
-                                    context,
-                                    _buildInput('Existing File No. *', _existingFileNoController, placeholder: 'File No.'),
-                                    _buildDateField('Date Of Issue', _dateOfIssueController),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  _buildDateField('Date Of Exp. *', _dateOfExpController),
-                                ],
-                              ],
-                            ),
-                          ),
-
-                          // SECTION 2: Parent Details (Screenshot 2)
-                          _buildHeaderBanner('2. Parent Details'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Father\'s Name *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading)),
-                                const SizedBox(height: 6),
-                                _buildThreeColumnRow(
-                                  context,
-                                  _buildInput('First Name', _fatherFirstNameController, placeholder: 'FIRST NAME/SURNAME *'),
-                                  _buildInput('Middle Name', _fatherMiddleNameController, helper: 'Minimum two Letters Allowed'),
-                                  _buildInput('Last Name', _fatherLastNameController, helper: 'Minimum two Letters Allowed'),
-                                ),
-                                const SizedBox(height: 16),
-                                const Text('Mother\'s Name *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading)),
-                                const SizedBox(height: 6),
-                                _buildThreeColumnRow(
-                                  context,
-                                  _buildInput('First Name', _motherFirstNameController, placeholder: 'FIRST NAME/SURNAME *'),
-                                  _buildInput('Middle Name', _motherMiddleNameController, helper: 'Minimum two Letters Allowed'),
-                                  _buildInput('Last Name', _motherLastNameController, helper: 'Minimum two Letters Allowed'),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // SECTION 4: Address For Communication (Screenshot 2)
-                          _buildHeaderBanner('4. Address For Communication'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 16),
-                                Row(
-                                  children: [
-                                    Expanded(child: _buildInput('House No./Building *', _houseNoController, helper: 'Enter Only 25 Characters')),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: _buildInput('Street/Area *', _streetAreaController, helper: 'Enter Only 25 Characters')),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(child: _buildInput('Tehsil/Post *', _tehsilPostController, helper: 'Enter Only 25 Characters')),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: _buildInput('Pincode *', _pincodeController, isNum: true, helper: 'Enter Only 25 Characters')),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(child: _buildInput('District *', _districtController, helper: 'Enter Only 25 Characters')),
-                                    const SizedBox(width: 12),
-                                    Expanded(child: _buildInput('State *', _stateController, helper: 'Enter Only 25 Characters')),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                _buildInput('City *', _cityController, helper: 'Enter Only 25 Characters'),
-                              ],
-                            ),
-                          ),
-
-                          // SECTION 4: Emergency Contact (Screenshot 2)
-                          _buildHeaderBanner('4. Emergency Contact'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              children: [
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Name & Address *', _emergencyNameAddressController),
-                                  _buildInput('Mobile Number *', _emergencyMobileController, isNum: true),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Email ID *', _emergencyEmailController),
-                                  _buildInput('Passport Kendra Location *', _kendraLocationController),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildDateField('Appointment Date *', _appointmentDateController),
-                                  _buildInput('Police Station *', _policeStationController),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // SECTION 5: Upload Document.
-                          _buildHeaderBanner('5. Upload Document.'),
-                          if (!_unlockedDocuments)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-                              child: Center(
-                                child: TextButton.icon(
-                                  onPressed: () => setState(() => _unlockedDocuments = true),
-                                  icon: const Icon(Icons.arrow_drop_down_circle_outlined, color: primaryTeal),
-                                  label: const Text(
-                                    'Proceed to Upload Documents & Payment',
-                                    style: TextStyle(color: primaryTeal, fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                ),
-                              ),
-                            )
-                          else ...[
-                            Padding(
-                              padding: const EdgeInsets.all(18.0),
-                              child: _buildDocUploadCardsForSubService(),
-                            ),
-                          ],
-
-                          // SECTION 7: Payment
-                          _buildHeaderBanner('7. Payment'),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
-                            child: Column(
-                              children: [
-                                Center(
-                                  child: Text(
-                                    'Total Payable Amount is ₹${_payableAmount.toStringAsFixed(2)}/-',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: textDarkHeading,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Center(
-                                  child: SizedBox(
-                                    width: 160,
-                                    height: 46,
-                                    child: ElevatedButton(
-                                      onPressed: _loading ? null : _submitPassportForm,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryTeal,
-                                        foregroundColor: Colors.white,
-                                        elevation: 3,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      child: _loading
-                                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                          : const Text(
-                                              'SUBMIT',
-                                              style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w800,
-                                                letterSpacing: 1.2,
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 44),
-                  ],
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: primaryPurple.withValues(alpha: 0.15)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_user_rounded, color: primaryPurple, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Secure & Trusted',
+                  style: TextStyle(
+                    color: primaryPurple,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -838,63 +575,751 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     );
   }
 
-  Widget _buildDocUploadCardsForSubService() {
-    List<Widget> cards = [];
-
-    if (_selectedSubService == 3) {
-      // Minor Passport
-      cards = [
-        _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-        _buildDocUploadCard('PAN Card / ID *', 'doc_pan'),
-        _buildDocUploadCard('Parents Passport *', 'doc_parent_passport'),
-        _buildDocUploadCard('Birth Certificate / Study Certificate *', 'doc_birth_cert'),
-      ];
-    } else if (_selectedSubService >= 4 && _selectedSubService <= 5) {
-      // Correction / Renewal Passport
-      cards = [
-        _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-        _buildDocUploadCard('PAN Card *', 'doc_pan'),
-        _buildDocUploadCard('Old Passport Front *', 'doc_passport_front'),
-        _buildDocUploadCard('Old Passport Back *', 'doc_passport_back'),
-        _buildDocUploadCard('10th Marksheet *', 'doc_marksheet'),
-      ];
-    } else if (_selectedSubService == 6) {
-      // Lost / Damage Passport
-      cards = [
-        _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-        _buildDocUploadCard('PAN Card *', 'doc_pan'),
-        _buildDocUploadCard('Old Passport Copy (If Available)', 'doc_old_passport'),
-        _buildDocUploadCard('FIR Copy (If Available) *', 'doc_fir'),
-        _buildDocUploadCard('10th Marksheet *', 'doc_marksheet'),
-      ];
-    } else if (_selectedSubService == 7) {
-      // PCC
-      cards = [
-        _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-        _buildDocUploadCard('Passport Copy *', 'doc_passport_copy'),
-      ];
-    } else {
-      // Normal & Tatkal
-      cards = [
-        _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-        _buildDocUploadCard('PAN Card *', 'doc_pan'),
-        _buildDocUploadCard('10th Marksheet *', 'doc_marksheet'),
-      ];
-    }
-
+  Widget _buildFlightHeroCard() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isWide = constraints.maxWidth > 700;
-        return isWide
-            ? Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: cards.map((c) => SizedBox(width: (constraints.maxWidth - 24) / 3, child: c)).toList(),
-              )
-            : Column(
-                children: cards.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10), child: c)).toList(),
-              );
+        final cardHeight = constraints.maxWidth / 1.6;
+        return Container(
+          width: double.infinity,
+          height: cardHeight,
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Image.asset(
+              'assets/Flight.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: const Color(0xFFF3F0FF),
+                  child: const Center(
+                    child: Icon(Icons.flight_takeoff_rounded, size: 70, color: primaryPurple),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
       },
+    );
+  }
+
+  Widget _buildCategoryTabs() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = (constraints.maxWidth - 20) / 3;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            children: [
+              _buildCategoryTabCard(
+                index: 0,
+                title: 'New Passport',
+                subtitle: 'Apply for a new passport',
+                icon: Icons.assignment_turned_in_outlined,
+                width: cardWidth,
+              ),
+              const SizedBox(width: 10),
+              _buildCategoryTabCard(
+                index: 1,
+                title: 'Correction Passport',
+                subtitle: 'Correction & Lost passport',
+                icon: Icons.edit_note_outlined,
+                width: cardWidth,
+              ),
+              const SizedBox(width: 10),
+              _buildCategoryTabCard(
+                index: 2,
+                title: 'PCC',
+                subtitle: 'Police Clearance Certificate',
+                icon: Icons.verified_user_outlined,
+                width: cardWidth,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryTabCard({
+    required int index,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required double width,
+  }) {
+    final isSelected = _selectedCategory == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedCategory = index;
+            if (index == 0) {
+              _selectedSubService = 1; // Normal
+            } else if (index == 1) {
+              _selectedSubService = 4; // Correction Normal
+            } else {
+              _selectedSubService = 7; // PCC
+            }
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFF5F3FF) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? primaryPurple : const Color(0xFFE2E8F0),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isSelected ? primaryPurple.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: isSelected ? primaryPurple : textSubdued,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? primaryPurple : textDarkHeading,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 8.5,
+                  color: textSubdued,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  Widget _buildAccordionSection({
+    required int index,
+    required String title,
+    required String subtitle,
+    required IconData leadingIcon,
+    required Widget child,
+  }) {
+    final isOpen = _expandedSectionIndex == index;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: cardSurface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isOpen ? primaryPurple.withValues(alpha: 0.15) : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expandedSectionIndex = isOpen ? -1 : index;
+              });
+            },
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isOpen ? const Color(0xFFF5F3FF) : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Icon(
+                        leadingIcon,
+                        color: isOpen ? primaryPurple : textSubdued,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: textDarkHeading,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: textSubdued,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: isOpen ? primaryPurple : textSubdued,
+                    size: 22,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 20.0),
+              child: child,
+            ),
+            crossFadeState: isOpen ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFormBody(bool isDesktop, Size screenSize) {
+    double horizontalPadding = screenSize.width > 1100
+        ? (screenSize.width - 920) / 2
+        : (screenSize.width > 700 ? 24.0 : 16.0);
+
+    // Dynamic sticky bottom button
+    String buttonTitle = "Next: Parent Details";
+    String buttonSubtitle = "Save and continue";
+    IconData buttonIcon = Icons.family_restroom_outlined;
+
+    if (_expandedSectionIndex == 1) {
+      buttonTitle = "Next: Address details";
+      buttonIcon = Icons.home_outlined;
+    } else if (_expandedSectionIndex == 2) {
+      buttonTitle = "Next: Emergency Contact";
+      buttonIcon = Icons.contact_phone_outlined;
+    } else if (_expandedSectionIndex == 3) {
+      buttonTitle = "Next: Upload Documents";
+      buttonIcon = Icons.cloud_upload_outlined;
+    } else if (_expandedSectionIndex == 4) {
+      buttonTitle = "Next: Payment Details";
+      buttonIcon = Icons.payment_outlined;
+    } else if (_expandedSectionIndex == 5) {
+      buttonTitle = "Proceed to Submit";
+      buttonSubtitle = "Final step to complete";
+      buttonIcon = Icons.check_circle_outline;
+    } else if (_expandedSectionIndex == -1) {
+      buttonTitle = "Submit Passport Form";
+      buttonSubtitle = "Fill & Review all details";
+      buttonIcon = Icons.description_outlined;
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        children: [
+          _buildTopNavBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFlightHeroCard(),
+                    _buildCategoryTabs(),
+
+                    // Step 1: Personal Information
+                    _buildAccordionSection(
+                      index: 0,
+                      title: "1. Personal Information",
+                      subtitle: "Enter applicant and birth details",
+                      leadingIcon: Icons.person_outline,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_selectedCategory == 0) ...[
+                            _buildDropdownField(
+                              'Application Type *',
+                              _selectedSubService == 1 ? 'Normal' : (_selectedSubService == 2 ? 'Tatkal' : 'Minor'),
+                              ['Normal', 'Tatkal', 'Minor'],
+                              (v) {
+                                setState(() {
+                                  if (v == 'Normal') _selectedSubService = 1;
+                                  if (v == 'Tatkal') _selectedSubService = 2;
+                                  if (v == 'Minor') _selectedSubService = 3;
+                                });
+                              },
+                              prefixIcon: Icons.assignment_outlined,
+                            ),
+                            const SizedBox(height: 14),
+                          ] else if (_selectedCategory == 1) ...[
+                            _buildDropdownField(
+                              'Application Type *',
+                              _selectedSubService == 4
+                                  ? 'Correction/Renewal passport'
+                                  : (_selectedSubService == 5
+                                      ? 'Correction/Renewal tatkal passport'
+                                      : 'Lost/damage passport'),
+                              [
+                                'Correction/Renewal passport',
+                                'Correction/Renewal tatkal passport',
+                                'Lost/damage passport'
+                              ],
+                              (v) {
+                                setState(() {
+                                  if (v == 'Correction/Renewal passport') _selectedSubService = 4;
+                                  if (v == 'Correction/Renewal tatkal passport') _selectedSubService = 5;
+                                  if (v == 'Lost/damage passport') _selectedSubService = 6;
+                                });
+                              },
+                              prefixIcon: Icons.assignment_outlined,
+                            ),
+                            const SizedBox(height: 14),
+                          ],
+
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Applicant\'s Name *', _applicantNameController, placeholder: 'Enter Applicant\'s Name', prefixIcon: Icons.person_outline),
+                            _buildInput('Initial Full Form', _initialFullFormController, placeholder: 'Enter Initial Full Form', prefixIcon: Icons.abc_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Place of Birth *', _birthPlaceController, placeholder: 'Enter Birth Place', prefixIcon: Icons.location_on_outlined),
+                            _buildInput('Birth District *', _birthDistrictController, placeholder: 'Enter Birth District', prefixIcon: Icons.location_city_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildDateField('Date of Birth *', _dobController),
+                            _buildDropdownField('Marital Status *', _maritalStatus, _maritalStatusList, (v) => setState(() => _maritalStatus = v!), prefixIcon: Icons.people_outline),
+                          ),
+                          if (_maritalStatus == 'Married') ...[
+                            const SizedBox(height: 14),
+                            _buildResponsiveRow(
+                              context,
+                              _buildInput('Spouse Name *', _spouseNameController, placeholder: 'Spouse Name', prefixIcon: Icons.person_outline),
+                              _buildInput('Spouse Initial/Full Form', _spouseInitialController, placeholder: 'Spouse Initial', prefixIcon: Icons.abc_outlined),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('PAN No. *', _panNoController, placeholder: 'PAN NO.', prefixIcon: Icons.credit_card_outlined),
+                            _buildInput('Aadhaar Number *', _aadhaarNoController, isNum: true, placeholder: 'AADHAAR NUMBER', prefixIcon: Icons.assignment_ind_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildDropdownField('Educational Qualification *', _education, _educationList, (v) => setState(() => _education = v!), prefixIcon: Icons.school_outlined),
+                            _buildDropdownField('Job Type *', _jobType, _jobTypeList, (v) => setState(() => _jobType = v!), prefixIcon: Icons.work_outline),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER', prefixIcon: Icons.phone_android_outlined),
+                            _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID', prefixIcon: Icons.mail_outline),
+                          ),
+
+                          if (_selectedCategory == 1) ...[
+                            const SizedBox(height: 16),
+                            const Divider(color: Color(0xFFE2E8F0)),
+                            const SizedBox(height: 12),
+                            _buildInput('Existing Passport No *', _existingPassportNoController, placeholder: 'Existing Passport Number', prefixIcon: Icons.badge_outlined),
+                            const SizedBox(height: 14),
+                            _buildResponsiveRow(
+                              context,
+                              _buildInput('Existing File No. *', _existingFileNoController, placeholder: 'Existing File Number', prefixIcon: Icons.folder_open_outlined),
+                              _buildDateField('Date Of Issue', _dateOfIssueController),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildDateField('Date Of Exp. *', _dateOfExpController),
+                          ],
+                        ],
+                      ),
+                    ),
+
+                    // Step 2: Parent Details
+                    _buildAccordionSection(
+                      index: 1,
+                      title: "2. Parent Details",
+                      subtitle: "Enter father's and mother's names",
+                      leadingIcon: Icons.family_restroom_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Father\'s Name *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDarkHeading)),
+                          const SizedBox(height: 8),
+                          _buildThreeColumnRow(
+                            context,
+                            _buildInput('First Name', _fatherFirstNameController, placeholder: 'First Name/Surname', prefixIcon: Icons.person_outline),
+                            _buildInput('Middle Name', _fatherMiddleNameController, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
+                            _buildInput('Last Name', _fatherLastNameController, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text('Mother\'s Name *', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDarkHeading)),
+                          const SizedBox(height: 8),
+                          _buildThreeColumnRow(
+                            context,
+                            _buildInput('First Name', _motherFirstNameController, placeholder: 'First Name/Surname', prefixIcon: Icons.person_outline),
+                            _buildInput('Middle Name', _motherMiddleNameController, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
+                            _buildInput('Last Name', _motherLastNameController, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Step 3: Address details
+                    _buildAccordionSection(
+                      index: 2,
+                      title: "3. Address For Communication",
+                      subtitle: "Enter your full mailing address",
+                      leadingIcon: Icons.home_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('House No./Building *', _houseNoController, placeholder: 'House No./Building', prefixIcon: Icons.home_outlined),
+                            _buildInput('Street/Area *', _streetAreaController, placeholder: 'Street/Area Name', prefixIcon: Icons.directions_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Tehsil/Post *', _tehsilPostController, placeholder: 'Tehsil or Post office', prefixIcon: Icons.location_city_outlined),
+                            _buildInput('Pincode *', _pincodeController, isNum: true, placeholder: 'Pincode', prefixIcon: Icons.pin_drop_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('District *', _districtController, placeholder: 'District Name', prefixIcon: Icons.map_outlined),
+                            _buildInput('State *', _stateController, placeholder: 'State Name', prefixIcon: Icons.public_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildInput('City *', _cityController, placeholder: 'City Name', prefixIcon: Icons.location_on_outlined),
+                        ],
+                      ),
+                    ),
+
+                    // Step 4: Emergency Contact
+                    _buildAccordionSection(
+                      index: 3,
+                      title: "4. Emergency Contact",
+                      subtitle: "Provide contact person details",
+                      leadingIcon: Icons.contact_phone_outlined,
+                      child: Column(
+                        children: [
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Name & Address *', _emergencyNameAddressController, placeholder: 'Name & Address', prefixIcon: Icons.contact_phone_outlined),
+                            _buildInput('Mobile Number *', _emergencyMobileController, isNum: true, placeholder: 'Emergency Mobile', prefixIcon: Icons.phone_android_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Email ID *', _emergencyEmailController, placeholder: 'Emergency Email', prefixIcon: Icons.mail_outline),
+                            _buildInput('Passport Kendra Location *', _kendraLocationController, placeholder: 'Passport Kendra', prefixIcon: Icons.my_location_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildDateField('Appointment Date *', _appointmentDateController),
+                            _buildInput('Police Station *', _policeStationController, placeholder: 'Police Station', prefixIcon: Icons.local_police_outlined),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Step 5: Upload Document
+                    _buildAccordionSection(
+                      index: 4,
+                      title: "5. Upload Documents",
+                      subtitle: "Upload required identity and study files",
+                      leadingIcon: Icons.cloud_upload_outlined,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAFAFA),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                final requiredKeys = _selectedSubService == 7 
+                                    ? ['aadhaar', 'passport_copy']
+                                    : ['aadhaar', 'pan', 'marksheet'];
+                                final firstEmpty = requiredKeys.firstWhere((k) => !_uploadedDocs.containsKey(k), orElse: () => 'aadhaar');
+                                _pickFile(firstEmpty);
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: primaryPurple.withValues(alpha: 0.2), style: BorderStyle.solid),
+                                ),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.cloud_upload_outlined, size: 36, color: primaryPurple),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Browse files to upload',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'PDF, PNG, JPG up to 2MB',
+                                      style: TextStyle(fontSize: 11, color: textSubdued),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            _buildDocUploadCardsForSubService(),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Step 6: Payment Details
+                    _buildAccordionSection(
+                      index: 5,
+                      title: "6. Payment Details",
+                      subtitle: "Review application fee and proceed",
+                      leadingIcon: Icons.payment_outlined,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F3FF),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _serviceTitle,
+                                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: textDarkHeading),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Processing and booking fee',
+                                        style: TextStyle(fontSize: 11, color: textSubdued),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  '₹${_payableAmount.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: primaryPurple),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              const Icon(Icons.shield_outlined, color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Payments are secure and encrypted.',
+                                  style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Sticky Bottom Gradient Button
+          SafeArea(
+            top: false,
+            child: _buildBottomActionButton(
+              title: buttonTitle,
+              subtitle: buttonSubtitle,
+              leftIcon: buttonIcon,
+              onTap: () {
+                if (_expandedSectionIndex >= 0 && _expandedSectionIndex < 5) {
+                  setState(() {
+                    _expandedSectionIndex++;
+                  });
+                } else if (_expandedSectionIndex == -1) {
+                  setState(() {
+                    _expandedSectionIndex = 0;
+                  });
+                } else {
+                  _submitPassportForm();
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActionButton({
+    required String title,
+    required String subtitle,
+    required IconData leftIcon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [primaryPurple, secondaryPurple],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: primaryPurple.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(leftIcon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    color: primaryPurple,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -915,9 +1340,9 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
             : Column(
                 children: [
                   c1,
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   c2,
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   c3,
                 ],
               );
@@ -928,13 +1353,13 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
   Widget _buildResponsiveRow(BuildContext context, Widget left, Widget right) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isWide = constraints.maxWidth > 550;
+        bool isWide = constraints.maxWidth > 650;
         return isWide
             ? Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: left),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(child: right),
                 ],
               )
@@ -942,7 +1367,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   left,
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   right,
                 ],
               );
@@ -950,34 +1375,14 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     );
   }
 
-  Widget _buildHeaderBanner(String title) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [headerGradientStart, headerGradientEnd],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(10),
-          topRight: Radius.circular(10),
-        ),
-      ),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14.5,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInput(String label, TextEditingController controller, {bool isNum = false, String? helper, String? placeholder}) {
+  Widget _buildInput(
+    String label,
+    TextEditingController controller, {
+    bool isNum = false,
+    String? placeholder,
+    IconData? prefixIcon,
+    String? helper,
+  }) {
     final isReq = label.contains('*');
     final cleanLabel = label.replaceAll('*', '').trim();
 
@@ -987,35 +1392,28 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: isNum ? TextInputType.number : TextInputType.text,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8), letterSpacing: 0.3),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            fillColor: const Color(0xFFF8FAFC),
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            counterText: helper,
+            counterStyle: const TextStyle(fontSize: 10, color: primaryPurple, fontWeight: FontWeight.w600),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
             filled: true,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: primaryTeal, width: 1.8),
-            ),
-            helperText: helper,
-            helperStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
           ),
           validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
         ),
@@ -1033,11 +1431,11 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         InkWell(
           onTap: () async {
             final date = await showDatePicker(
@@ -1049,7 +1447,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
                 return Theme(
                   data: Theme.of(context).copyWith(
                     colorScheme: const ColorScheme.light(
-                      primary: primaryTeal,
+                      primary: primaryPurple,
                       onPrimary: Colors.white,
                       onSurface: textDarkHeading,
                     ),
@@ -1067,16 +1465,17 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
           child: IgnorePointer(
             child: TextFormField(
               controller: controller,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
               decoration: InputDecoration(
                 hintText: 'DD/MM/YYYY',
-                hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-                suffixIcon: const Icon(Icons.calendar_month, size: 18, color: primaryTeal),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                fillColor: const Color(0xFFF8FAFC),
+                hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                suffixIcon: const Icon(Icons.calendar_month_outlined, size: 20, color: primaryPurple),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                fillColor: const Color(0xFFFAFAFA),
                 filled: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
               ),
               validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
             ),
@@ -1086,7 +1485,13 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
     );
   }
 
-  Widget _buildDropdownField(String label, String value, List<String> items, ValueChanged<String?> onChanged) {
+  Widget _buildDropdownField(
+    String label,
+    String value,
+    List<String> items,
+    ValueChanged<String?> onChanged, {
+    IconData? prefixIcon,
+  }) {
     final isReq = label.contains('*');
     final cleanLabel = label.replaceAll('*', '').trim();
 
@@ -1096,105 +1501,178 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         DropdownButtonFormField<String>(
-          initialValue: value,
+          initialValue: items.contains(value) ? value : null,
           isExpanded: true,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            fillColor: const Color(0xFFF8FAFC),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
           ),
-          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: textDarkHeading), overflow: TextOverflow.ellipsis))).toList(),
           onChanged: onChanged,
+          validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
         ),
       ],
     );
   }
 
+  Widget _buildDocUploadCardsForSubService() {
+    List<Widget> cards = [];
+
+    if (_selectedSubService == 3) {
+      // Minor Passport
+      cards = [
+        _buildDocUploadCard('Aadhaar Card *', 'aadhaar'),
+        _buildDocUploadCard('PAN Card / ID *', 'pan'),
+        _buildDocUploadCard('Parents Passport *', 'parent_passport'),
+        _buildDocUploadCard('Birth Certificate / Study Certificate *', 'birth_cert'),
+      ];
+    } else if (_selectedSubService >= 4 && _selectedSubService <= 5) {
+      // Correction / Renewal Passport
+      cards = [
+        _buildDocUploadCard('Aadhaar Card *', 'aadhaar'),
+        _buildDocUploadCard('PAN Card *', 'pan'),
+        _buildDocUploadCard('Old Passport Front *', 'passport_front'),
+        _buildDocUploadCard('Old Passport Back *', 'passport_back'),
+        _buildDocUploadCard('10th Marksheet *', 'marksheet'),
+      ];
+    } else if (_selectedSubService == 6) {
+      // Lost / Damage Passport
+      cards = [
+        _buildDocUploadCard('Aadhaar Card *', 'aadhaar'),
+        _buildDocUploadCard('PAN Card *', 'pan'),
+        _buildDocUploadCard('Old Passport Copy (If Available)', 'old_passport'),
+        _buildDocUploadCard('FIR Copy (If Available) *', 'fir'),
+        _buildDocUploadCard('10th Marksheet *', 'marksheet'),
+      ];
+    } else if (_selectedSubService == 7) {
+      // PCC
+      cards = [
+        _buildDocUploadCard('Aadhaar Card *', 'aadhaar'),
+        _buildDocUploadCard('Passport Copy *', 'passport_copy'),
+      ];
+    } else {
+      // Normal & Tatkal
+      cards = [
+        _buildDocUploadCard('Aadhaar Card *', 'aadhaar'),
+        _buildDocUploadCard('PAN Card *', 'pan'),
+        _buildDocUploadCard('10th Marksheet *', 'marksheet'),
+      ];
+    }
+
+    return Column(
+      children: cards.map((c) => Padding(padding: const EdgeInsets.only(bottom: 12), child: c)).toList(),
+    );
+  }
+
   Widget _buildDocUploadCard(String title, String docKey) {
     final docs = _uploadedDocs[docKey] ?? [];
+    final hasFile = docs.isNotEmpty;
+    final file = hasFile ? docs.first : null;
+    final fileName = file != null ? (file['name'] ?? '') : '';
+    final fileSize = file != null ? (file['size'] as int? ?? 0) : 0;
+    
+    final isReq = title.contains('*');
+    final cleanTitle = title.replaceAll('*', '').trim();
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5),
+        border: Border.all(color: hasFile ? primaryPurple.withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(5),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F9D58).withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.upload_file_rounded, size: 20, color: Color(0xFF0F9D58)),
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: docKey.contains('photo') ? const [Color(0xFF6366F1), Color(0xFF3B82F6)] : 
+                        docKey.contains('aadhaar') ? const [Color(0xFFEF4444), Color(0xFFDC2626)] :
+                        docKey.contains('pan') ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)] :
+                        const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: textDarkHeading),
-                  maxLines: 2,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              docKey.contains('photo') ? Icons.person : 
+              docKey.contains('aadhaar') ? Icons.credit_card :
+              Icons.credit_card, 
+              color: Colors.white, size: 24
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  TextSpan(
+                    text: hasFile ? fileName : cleanTitle,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textDarkHeading),
+                    children: (!hasFile && isReq) ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+                  ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 36,
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                const SizedBox(height: 4),
+                Text(
+                  hasFile ? 'Uploaded • ${_formatBytes(fileSize)}' : 'PDF, PNG, JPG up to 2MB',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: textSubdued,
                   ),
-                  child: Text(
-                    docs.isNotEmpty ? docs.first['name'] : 'Choose file (< 2MB)',
-                    style: TextStyle(fontSize: 11, color: docs.isNotEmpty ? primaryTeal : textSubdued, fontWeight: docs.isNotEmpty ? FontWeight.w600 : FontWeight.w400),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () => _pickFile(docKey),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F9D58),
-                  foregroundColor: Colors.white,
-                  elevation: 1,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-                  minimumSize: const Size(0, 36),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('Browse', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 10),
+          if (hasFile)
+            IconButton(
+              onPressed: () => _removeFile(docKey),
+              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF94A3B8), size: 24),
+              tooltip: 'Remove file',
+            )
+          else
+            ElevatedButton.icon(
+              onPressed: () => _pickFile(docKey),
+              icon: const Icon(Icons.upload_rounded, size: 16),
+              label: const Text('Upload', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryPurple.withValues(alpha: 0.1),
+                foregroundColor: primaryPurple,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                minimumSize: const Size(0, 36),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
         ],
       ),
     );
@@ -1212,7 +1690,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
             borderRadius: BorderRadius.circular(22),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(16),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 22,
                 offset: const Offset(0, 10),
               ),
@@ -1225,7 +1703,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
                 width: 72,
                 height: 72,
                 decoration: const BoxDecoration(
-                  color: primaryTeal,
+                  color: primaryPurple,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, color: Colors.white, size: 42),
@@ -1245,8 +1723,9 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 decoration: BoxDecoration(
-                  color: primaryTeal.withAlpha(18),
+                  color: const Color(0xFFF5F3FF),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children: [
@@ -1254,7 +1733,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
                     const SizedBox(height: 4),
                     Text(
                       _trackingId ?? '',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTeal, letterSpacing: 0.5),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryPurple, letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -1266,7 +1745,7 @@ class _PassportServiceScreenState extends State<PassportServiceScreen>
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryTeal,
+                    backgroundColor: primaryPurple,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -1333,7 +1812,7 @@ class _LoginModalState extends State<_LoginModal> {
             child: ElevatedButton(
               onPressed: _loading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00A896),
+                backgroundColor: primaryPurple,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),

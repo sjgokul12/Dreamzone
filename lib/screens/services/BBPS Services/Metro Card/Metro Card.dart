@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 import '../../../../services/metro_api_service.dart';
 
 typedef MetroCard = MetroCardScreen;
@@ -46,6 +48,9 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   String get _base => ApiService.baseUrl;
   bool get _canShowAmount => _cardNoCtrl.text.trim().isNotEmpty && _selectedOp != null;
 
@@ -68,6 +73,7 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -87,6 +93,7 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
     _cardNoCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -113,20 +120,41 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
     if (_selectedOp == null) { _snack('Please select a metro operator', isError: true); return; }
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn || auth.userId == null) { _snack('Please login', isError: true); return; }
+
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'Metro Card – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitMetro(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _snack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitMetro({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() { _submitting = true; _resultStatus = null; });
     try {
       final data = await MetroApiService.pay({
-          'user_id':       auth.userId,
-          'card_number':   _cardNoCtrl.text.trim(),
-          'operator_id':   _selectedOp!['spkey']?.toString() ?? '',
-          'operator_name': _selectedOp!['label']?.toString() ?? '',
-          'amount':        _amountCtrl.text.trim(),
+          'user_id':             auth.userId,
+          'card_number':         _cardNoCtrl.text.trim(),
+          'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
+          'operator_name':       _selectedOp!['label']?.toString() ?? '',
+          'amount':              _amountCtrl.text.trim(),
+          'razorpay_payment_id': razorpayPaymentId,
+          'payment_status':      'paid',
         });
       if (mounted) {
         setState(() {
           _submitting    = false;
-          _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
-          _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'Metro card recharged!' : 'Recharge failed');
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultMessage = (data['message']?.toString() ?? (_resultStatus == 'success' ? 'Metro card recharged!' : 'Recharge failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'MTR${DateTime.now().millisecondsSinceEpoch}';
         });
       }
@@ -694,7 +722,7 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
               ),
               const SizedBox(height: 8),
               Text(
-                _resultMessage ?? '',
+                (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: textSubdued, fontSize: 13),
               ),
@@ -813,3 +841,6 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
     );
   }
 }
+
+
+

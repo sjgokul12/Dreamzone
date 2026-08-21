@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 /// Convenient alias so both `DTH` and `DTHScreen` can be used.
 typedef DTH = DTHScreen;
@@ -52,6 +54,9 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   // ─── Operator icon mapping by code / label keywords ────────────────────────
   static IconData _iconForOperator(String code, String label) {
     final key = '${code}_$label'.toLowerCase();
@@ -85,6 +90,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fetchOperators();
   }
 
@@ -92,6 +98,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
   void dispose() {
     _customerIdCtrl.dispose();
     _amountCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -148,33 +155,47 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
       return;
     }
 
-    setState(() {
-      _submitting = true;
-      _resultStatus = null;
-    });
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    // Open Razorpay first; backend called only on payment success
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'DTH Recharge – ${_selectedOperator!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitDth(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _showSnackBar('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitDth({required dynamic auth, required String razorpayPaymentId}) async {
+    setState(() { _submitting = true; _resultStatus = null; });
 
     try {
       final res = await ApiService.postApi('/dth/pay', {
-        'user_id': auth.userId,
-        'customer_id': _customerIdCtrl.text.trim(),
-        'operator_id': _selectedOperator!['spkey']?.toString() ??
-            _selectedOperator!['id']?.toString() ?? '',
-        'operator_name': _selectedOperator!['label']?.toString() ??
-            _selectedOperator!['name']?.toString() ?? '',
-        'amount': _amountCtrl.text.trim(),
+        'user_id':             auth.userId,
+        'customer_id':         _customerIdCtrl.text.trim(),
+        'operator_id':         _selectedOperator!['spkey']?.toString() ?? _selectedOperator!['id']?.toString() ?? '',
+        'operator_name':       _selectedOperator!['label']?.toString() ?? _selectedOperator!['name']?.toString() ?? '',
+        'amount':              _amountCtrl.text.trim(),
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status':      'paid',
       });
 
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
           _submitting = false;
-          _resultStatus = data['success'] == true
-              ? (data['status']?.toString() ?? 'success')
-              : 'failed';
-          _resultMessage = data['message']?.toString() ??
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultMessage = (data['message']?.toString() ??
               (_resultStatus == 'success'
                   ? 'DTH Recharge submitted successfully!'
-                  : 'DTH Recharge failed. Please try again.');
+                  : 'DTH Recharge failed. Please try again.')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id']?.toString() ??
               'DTH${DateTime.now().millisecondsSinceEpoch}';
         });
@@ -1109,7 +1130,7 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 10),
             Text(
-              _resultMessage ?? '',
+              (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 14, color: textMuted, height: 1.5),
             ),
@@ -1316,3 +1337,6 @@ class _DTHScreenState extends State<DTHScreen> with TickerProviderStateMixin {
     );
   }
 }
+
+
+

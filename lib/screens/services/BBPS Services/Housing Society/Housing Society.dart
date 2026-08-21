@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../core/payment/razorpay_service.dart';
 
 typedef HousingSociety = HousingSocietyScreen;
 typedef Housing        = HousingSocietyScreen;
@@ -45,6 +47,9 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
   String? _resultMessage;
   String? _merchantTxnId;
 
+  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  final RazorpayService _razorpayService = RazorpayService();
+
   String get _base => ApiService.baseUrl;
   bool get _canShowAmount =>
       _consumerIdCtrl.text.trim().isNotEmpty && _selectedOp != null;
@@ -70,6 +75,7 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
   @override
   void initState() {
     super.initState();
+    _razorpayService.init();
     _fetchOperators();
     _searchCtrl.addListener(() => setState(() {}));
   }
@@ -79,6 +85,7 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
     _consumerIdCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
+    _razorpayService.dispose();
     super.dispose();
   }
 
@@ -115,25 +122,46 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
     if (_selectedOp == null) { _snack('Please select a housing society', isError: true); return; }
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn || auth.userId == null) { _snack('Please login', isError: true); return; }
+
+    final double amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
+
+    _razorpayService.openPaymentGateway(
+      amount: amount,
+      description: 'Housing Society – ${_selectedOp!['label'] ?? 'Payment'}',
+      name: 'DZI Infinity',
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitHousingSociety(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          _snack('Payment failed: ${response.message ?? "Unknown error"}', isError: true);
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitHousingSociety({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() { _submitting = true; _resultStatus = null; });
     try {
       final res = await http.post(
         Uri.parse('$_base/housing-society/pay'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'user_id':       auth.userId,
-          'consumer_no':   _consumerIdCtrl.text.trim(),
-          'operator_id':   _selectedOp!['spkey']?.toString() ?? '',
-          'operator_name': _selectedOp!['label']?.toString() ?? '',
-          'amount':        _amountCtrl.text.trim(),
+          'user_id':             auth.userId,
+          'consumer_no':         _consumerIdCtrl.text.trim(),
+          'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
+          'operator_name':       _selectedOp!['label']?.toString() ?? '',
+          'amount':              _amountCtrl.text.trim(),
+          'razorpay_payment_id': razorpayPaymentId,
+          'payment_status':      'paid',
         }),
       ).timeout(const Duration(seconds: 60));
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
           _submitting    = false;
-          _resultStatus  = data['success'] == true ? (data['status']?.toString() ?? 'success') : 'failed';
-          _resultMessage = data['message']?.toString() ?? (_resultStatus == 'success' ? 'Maintenance paid successfully!' : 'Payment failed');
+          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultMessage = (data['message']?.toString() ?? (_resultStatus == 'success' ? 'Maintenance paid successfully!' : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id']?.toString() ?? 'HSG${DateTime.now().millisecondsSinceEpoch}';
         });
       }
@@ -846,7 +874,7 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
           Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: col)),
           const SizedBox(height: 10),
           Text(
-            _resultMessage ?? '',
+            (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13.5, color: textMuted, height: 1.5),
           ),
@@ -890,3 +918,6 @@ class _HousingSocietyScreenState extends State<HousingSocietyScreen>
     );
   }
 }
+
+
+

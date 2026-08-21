@@ -8,7 +8,7 @@ class ApiService {
   static const String adminBaseUrl = 'https://dzi-backend.onrender.com/api/admin';
 
   /// Centralized GET request that scans local IPs (192.168.1.6, 127.0.0.1, 10.0.2.2), localhost, and production Render URL.
-  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 60}) async {
+  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 8}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = <String, String>{};
@@ -25,7 +25,7 @@ class ApiService {
   }
 
   /// Centralized POST request that scans local IPs and production Render URL.
-  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 60}) async {
+  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 8}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = {'Content-Type': 'application/json'};
@@ -52,7 +52,7 @@ class ApiService {
       final response = await http.get(
         Uri.parse('$baseUrl$endpoint'),
         headers: headers,
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(const Duration(seconds: 8));
       
       if (response.body.trim().isEmpty) {
         return {'success': false, 'message': 'Empty response from server (HTTP ${response.statusCode})'};
@@ -213,6 +213,53 @@ class ApiService {
     }
   }
 
+  Future<void> saveSubmittedApplication(Map<String, dynamic> app) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const key = 'local_submitted_applications';
+      final existingJson = prefs.getString(key);
+      List<dynamic> list = [];
+      if (existingJson != null && existingJson.isNotEmpty) {
+        try {
+          list = jsonDecode(existingJson);
+        } catch (_) {
+          list = [];
+        }
+      }
+      list.removeWhere((item) =>
+          item is Map &&
+          ((item['application_no'] != null && item['application_no'] == app['application_no']) ||
+              (item['tracking_id'] != null && item['tracking_id'] == app['tracking_id'])));
+      list.insert(0, app);
+      if (list.length > 100) {
+        list = list.sublist(0, 100);
+      }
+      await prefs.setString(key, jsonEncode(list));
+    } catch (_) {}
+  }
+
+  Future<List<Map<String, dynamic>>> getLocalSubmittedApplications(int? userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const key = 'local_submitted_applications';
+      final existingJson = prefs.getString(key);
+      if (existingJson == null || existingJson.isEmpty) return [];
+      final List<dynamic> decoded = jsonDecode(existingJson);
+      final apps = <Map<String, dynamic>>[];
+      for (final item in decoded) {
+        if (item is Map) {
+          final map = Map<String, dynamic>.from(item);
+          if (userId == null || map['user_id'] == null || map['user_id'].toString() == userId.toString()) {
+            apps.add(map);
+          }
+        }
+      }
+      return apps;
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<Map<String, dynamic>> getUserApplications(int userId) async {
     return _get('/user/$userId/applications');
   }
@@ -222,7 +269,27 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUserAllApplications(int userId) async {
-    return _get('/user/$userId/all-applications');
+    List<Map<String, dynamic>> remoteApps = [];
+    try {
+      final res = await _get('/user/$userId/all-applications');
+      if (res['success'] == true && res['applications'] != null) {
+        remoteApps = List<Map<String, dynamic>>.from(res['applications']);
+      }
+    } catch (_) {}
+
+    final localApps = await getLocalSubmittedApplications(userId);
+
+    final seen = <String>{};
+    final merged = <Map<String, dynamic>>[];
+
+    for (final app in [...localApps, ...remoteApps]) {
+      final ref = (app['application_no'] ?? app['tracking_id'] ?? app['id'])?.toString() ?? '';
+      if (ref.isNotEmpty && seen.contains(ref)) continue;
+      if (ref.isNotEmpty) seen.add(ref);
+      merged.add(app);
+    }
+
+    return {'success': true, 'applications': merged};
   }
 
   // ==================== SETTINGS ====================
@@ -383,4 +450,53 @@ class ApiService {
       return {'success': false, 'message': 'Connection failed'};
     }
   }
+
+  // ==================== PAYMENT & ORDER SECURITY ====================
+
+  /// Creates a secure Razorpay order on backend
+  static Future<Map<String, dynamic>> createRazorpayOrder({
+    required double amount,
+    String? receipt,
+    Map<String, dynamic>? notes,
+  }) async {
+    try {
+      final res = await postApi('/payment/create-order', {
+        'amount': amount,
+        'currency': 'INR',
+        ...?receipt != null ? {'receipt': receipt} : null,
+        ...?notes != null ? {'notes': notes} : null,
+      }, timeoutSeconds: 12);
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        return jsonDecode(res.body);
+      }
+      return {'success': false, 'message': 'Failed to create payment order'};
+    } catch (e) {
+      return {'success': false, 'message': 'Payment service error: $e'};
+    }
+  }
+
+  /// Cryptographically verifies payment signature with backend HMAC-SHA256
+  static Future<Map<String, dynamic>> verifyRazorpayPayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+  }) async {
+    try {
+      final res = await postApi('/payment/verify', {
+        'razorpay_order_id': orderId,
+        'razorpay_payment_id': paymentId,
+        'razorpay_signature': signature,
+      }, timeoutSeconds: 12);
+
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      final err = jsonDecode(res.body);
+      return {'success': false, 'message': err['message'] ?? 'Payment verification failed'};
+    } catch (e) {
+      return {'success': false, 'message': 'Payment verification error: $e'};
+    }
+  }
 }
+

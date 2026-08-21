@@ -158,7 +158,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -185,7 +185,7 @@ class _OtpScreenState extends State<OtpScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
                 child: Card(
                   elevation: 4,
-                  shadowColor: primaryPurple.withOpacity(0.1),
+                  shadowColor: primaryPurple.withValues(alpha: 0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
                   ),

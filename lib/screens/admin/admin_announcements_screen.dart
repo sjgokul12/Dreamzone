@@ -286,7 +286,10 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                             fontSize: isPhone ? 13 : 15,
                           ),
                         ),
-                        subtitle: Row(
+                        subtitle: Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
@@ -306,7 +309,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
                             Text(
                               dateStr,
                               style: TextStyle(

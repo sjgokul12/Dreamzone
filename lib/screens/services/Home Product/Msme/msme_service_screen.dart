@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:dreamzoneapp/providers/auth_provider.dart';
 import 'package:dreamzoneapp/services/api_service.dart';
+import 'package:dreamzoneapp/core/payment/razorpay_service.dart';
 
 class MsmeServiceScreen extends StatefulWidget {
   final Map<String, dynamic> service;
@@ -29,11 +30,12 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final ApiService _api = ApiService();
+  final RazorpayService _razorpayService = RazorpayService();
   bool _submitted = false;
   bool _loading = false;
   String? _trackingId;
 
-  // 1. Personal Information Controllers (Matching User Screenshot Exactly)
+  // 1. Personal Information Controllers
   final TextEditingController _businessNameController    = TextEditingController();
   final TextEditingController _applicantNameController   = TextEditingController();
   final TextEditingController _panNoController           = TextEditingController();
@@ -65,16 +67,17 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Premium Teal Palette
-  static const Color primaryTeal        = Color(0xFF00A896);
-  static const Color secondaryTeal      = Color(0xFF0284C7);
-  static const Color headerGradientStart= Color(0xFF0F766E);
-  static const Color headerGradientEnd  = Color(0xFF0284C7);
+  // Premium Violet / Indigo Palette
+  static const Color primaryPurple      = Color(0xFF5F33E1);
+  static const Color secondaryPurple    = Color(0xFF7C3AED);
   static const Color textDarkHeading    = Color(0xFF0F172A);
   static const Color textLabelDark      = Color(0xFF1E293B);
   static const Color textSubdued        = Color(0xFF64748B);
-  static const Color bgCanvas           = Color(0xFFF1F5F9);
+  static const Color bgCanvas           = Color(0xFFF8FAFC);
   static const Color cardSurface        = Colors.white;
+
+  // Step state tracker for Accordions
+  int _expandedSectionIndex = 0; 
 
   @override
   void initState() {
@@ -89,12 +92,14 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     );
     _animationController.forward();
 
-    _fetchDropdownOptions(); // ✅ Dynamic API fetch for States & Account Types
+    _fetchDropdownOptions();
     _loadSavedUserData();
+    _razorpayService.init();
   }
 
   @override
   void dispose() {
+    _razorpayService.dispose();
     _animationController.dispose();
     _businessNameController.dispose();
     _applicantNameController.dispose();
@@ -115,7 +120,6 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
   Future<void> _fetchDropdownOptions() async {
     if (mounted) setState(() { _statesLoading = true; });
     try {
-      // 1. Fetch States
       try {
         final resStates = await ApiService.fetchApi('/msme/states');
         final dataStates = jsonDecode(resStates.body) as Map<String, dynamic>;
@@ -126,7 +130,6 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
         _deliveryStates = ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli","Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Pondicherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
       }
 
-      // 2. Fetch Account Types
       try {
         final resAcc = await ApiService.fetchApi('/msme/account-types');
         final dataAcc = jsonDecode(resAcc.body) as Map<String, dynamic>;
@@ -201,14 +204,14 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
             Text('✨ Saved profile details applied!', style: TextStyle(fontWeight: FontWeight.w600)),
           ],
         ),
-        backgroundColor: primaryTeal,
+        backgroundColor: primaryPurple,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
 
-  double get _payableAmount => 500.00;
+  double get _payableAmount => 249.00;
 
   String _formatBytes(int bytes) {
     if (bytes <= 0) return '0 KB';
@@ -261,7 +264,24 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
   }
 
   Future<void> _submitMsmeForm() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      if (_businessNameController.text.trim().isEmpty ||
+          _applicantNameController.text.trim().isEmpty ||
+          _panNoController.text.trim().isEmpty ||
+          _aadhaarNoController.text.trim().isEmpty ||
+          _businessEstDateController.text.trim().isEmpty ||
+          _businessAddressController.text.trim().isEmpty) {
+        setState(() => _expandedSectionIndex = 0);
+        return;
+      }
+      if (_mobileNumberController.text.trim().isEmpty ||
+          _emailIdController.text.trim().isEmpty ||
+          _deliveryState == null) {
+        setState(() => _expandedSectionIndex = 1);
+        return;
+      }
+      return;
+    }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn) {
@@ -269,25 +289,52 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
       return;
     }
 
+    // Open Razorpay first; backend called only on payment success
+    _razorpayService.openPaymentGateway(
+      amount: _payableAmount,
+      description: 'MSME Registration',
+      name: 'DZI Infinity',
+      contact: _mobileNumberController.text.trim(),
+      email: _emailIdController.text.trim(),
+      onSuccess: (PaymentSuccessResponse response) {
+        _doSubmitMsmeForm(auth: auth, razorpayPaymentId: response.paymentId ?? '');
+      },
+      onFailure: (PaymentFailureResponse response) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Payment failed: ${response.message ?? "Unknown error"}'),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _doSubmitMsmeForm({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() => _loading = true);
 
     Map<String, String> formData = {
       'service_type':       'MSME Registration',
-      'business_name':     _businessNameController.text.trim(),
-      'applicant_name':    _applicantNameController.text.trim(),
-      'pan_no':            _panNoController.text.trim(),
-      'aadhaar_no':        _aadhaarNoController.text.trim(),
-      'business_est_date': _businessEstDateController.text.trim(),
-      'business_address':  _businessAddressController.text.trim(),
-      'aadhaar_address':   _aadhaarAddressController.text.trim(),
-      'mobile_number':     _mobileNumberController.text.trim(),
-      'email_id':          _emailIdController.text.trim(),
-      'delivery_state':    _deliveryState ?? '',
-      'bank_name':         _bankNameController.text.trim(),
-      'account_no':        _accountNoController.text.trim(),
-      'ifsc_code':         _ifscCodeController.text.trim(),
-      'account_type':      _accountType ?? '',
-      'amount':            _payableAmount.toStringAsFixed(2),
+      'business_name':      _businessNameController.text.trim(),
+      'applicant_name':     _applicantNameController.text.trim(),
+      'pan_no':             _panNoController.text.trim(),
+      'aadhaar_no':         _aadhaarNoController.text.trim(),
+      'business_est_date':  _businessEstDateController.text.trim(),
+      'business_address':   _businessAddressController.text.trim(),
+      'aadhaar_address':    _aadhaarAddressController.text.trim(),
+      'mobile_number':      _mobileNumberController.text.trim(),
+      'email_id':           _emailIdController.text.trim(),
+      'delivery_state':     _deliveryState ?? '',
+      'bank_name':          _bankNameController.text.trim(),
+      'account_no':         _accountNoController.text.trim(),
+      'ifsc_code':          _ifscCodeController.text.trim(),
+      'account_type':       _accountType ?? '',
+      'amount':             _payableAmount.toStringAsFixed(2),
+      'razorpay_payment_id': razorpayPaymentId,
+      'payment_status':     'paid',
     };
 
     try {
@@ -366,356 +413,616 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     );
   }
 
-  Widget _buildFormBody(bool isDesktop, Size screenSize) {
-    double horizontalPadding = screenSize.width > 1100
-        ? (screenSize.width - 920) / 2
-        : (screenSize.width > 700 ? 24.0 : 12.0);
-
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: CustomScrollView(
-        slivers: [
-          // Top Curved Hero Container (Header: MSME only)
-          SliverToBoxAdapter(
+  Widget _buildTopNavBar() {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 8,
+        left: 16,
+        right: 16,
+        bottom: 8,
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
             child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.only(
-                top: MediaQuery.of(context).padding.top + 14,
-                bottom: 30,
-                left: 16,
-                right: 16,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [headerGradientStart, headerGradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+              child: const Icon(Icons.arrow_back, color: primaryPurple, size: 20),
+            ),
+          ),
+          const Spacer(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF5F3FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.verified_user_rounded, color: primaryPurple, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'BBPS Assured',
+                  style: TextStyle(
+                    color: primaryPurple,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(28),
-                  bottomRight: Radius.circular(28),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Icon(Icons.settings_outlined, color: primaryPurple, size: 22),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMsmeHeroCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF3F0FF), Color(0xFFECE9FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: primaryPurple.withValues(alpha: 0.15)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                        onPressed: () => Navigator.pop(context),
+                      Icon(Icons.storefront_outlined, color: primaryPurple, size: 14),
+                      SizedBox(width: 6),
+                      Text(
+                        'MSME REGISTRATION',
+                        style: TextStyle(
+                          color: primaryPurple,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                      const Spacer(),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Register Your',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: textDarkHeading,
+                    height: 1.1,
+                  ),
+                ),
+                const Text(
+                  'MSME',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: primaryPurple,
+                    height: 1.1,
+                  ),
+                ),
+                const Text(
+                  'Business',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: textDarkHeading,
+                    height: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Enter your business details and register your MSME securely.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textSubdued,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 4,
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: Image.asset(
+                'assets/MSME full.png',
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(Icons.storefront_rounded, size: 60, color: primaryPurple),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureBadges() {
+    final features = [
+      {'icon': Icons.folder_shared_outlined, 'title': 'Business Info', 'desc': 'Your Details'},
+      {'icon': Icons.business_outlined, 'title': 'MSME Info', 'desc': 'Business Type'},
+      {'icon': Icons.flash_on_outlined, 'title': 'Instant', 'desc': 'Quick Process'},
+      {'icon': Icons.shield_outlined, 'title': 'Secured', 'desc': '100% Safe'},
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: features.map((f) {
+          return Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F3FF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(f['icon'] as IconData, color: primaryPurple, size: 22),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  f['title'] as String,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDarkHeading),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  f['desc'] as String,
+                  style: const TextStyle(fontSize: 10, color: textSubdued),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildAccordionSection({
+    required int index,
+    required String title,
+    required String subtitle,
+    required IconData leadingIcon,
+    required Widget child,
+  }) {
+    final isOpen = _expandedSectionIndex == index;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: cardSurface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: isOpen ? primaryPurple.withValues(alpha: 0.15) : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _expandedSectionIndex = isOpen ? -1 : index;
+              });
+            },
+            borderRadius: BorderRadius.circular(22),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
                   Container(
-                    width: 68,
-                    height: 68,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
+                      color: isOpen ? const Color(0xFFF5F3FF) : const Color(0xFFF1F5F9),
+                      shape: BoxShape.circle,
                     ),
-                    child: const Center(
-                      child: Icon(Icons.storefront_rounded, color: Colors.white, size: 40),
+                    child: Center(
+                      child: Icon(
+                        leadingIcon,
+                        color: isOpen ? primaryPurple : textSubdued,
+                        size: 22,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'MSME',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: textDarkHeading,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: textSubdued,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  Icon(
+                    isOpen ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    color: isOpen ? primaryPurple : textSubdued,
+                    size: 22,
                   ),
                 ],
               ),
             ),
           ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 20.0),
+              child: child,
+            ),
+            crossFadeState: isOpen ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 250),
+          ),
+        ],
+      ),
+    );
+  }
 
-          // Main Form Content Card
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+  Widget _buildFormBody(bool isDesktop, Size screenSize) {
+    double horizontalPadding = screenSize.width > 1100
+        ? (screenSize.width - 920) / 2
+        : (screenSize.width > 700 ? 24.0 : 16.0);
+
+    // Dynamic strings for sticky bottom button
+    String buttonTitle = "Next: Contact Information";
+    String buttonSubtitle = "Save and continue";
+    IconData buttonIcon = Icons.contacts_outlined;
+
+    if (_expandedSectionIndex == 1) {
+      buttonTitle = "Next: Bank Details";
+      buttonIcon = Icons.account_balance_outlined;
+    } else if (_expandedSectionIndex == 2) {
+      buttonTitle = "Next: Upload Documents";
+      buttonIcon = Icons.cloud_upload_outlined;
+    } else if (_expandedSectionIndex == 3) {
+      buttonTitle = "Next: Payment Info";
+      buttonIcon = Icons.payment_outlined;
+    } else if (_expandedSectionIndex == 4) {
+      buttonTitle = "Proceed to Submit";
+      buttonSubtitle = "Final step to complete";
+      buttonIcon = Icons.check_circle_outline;
+    } else if (_expandedSectionIndex == -1) {
+      buttonTitle = "Submit MSME Form";
+      buttonSubtitle = "Fill & Review all details";
+      buttonIcon = Icons.description_outlined;
+    }
+
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Column(
+        children: [
+          _buildTopNavBar(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 8),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildMsmeHeroCard(),
+                    _buildFeatureBadges(),
+                    
                     if (_savedDetails != null) ...[
                       Align(
                         alignment: Alignment.centerRight,
-                        child: ElevatedButton.icon(
+                        child: TextButton.icon(
                           onPressed: _applySavedDetails,
-                          icon: const Icon(Icons.bolt, color: Colors.white, size: 16),
+                          icon: const Icon(Icons.bolt, color: primaryPurple, size: 16),
                           label: const Text(
                             'Auto-Fill Saved Profile',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            style: TextStyle(color: primaryPurple, fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryTeal,
-                            elevation: 1,
+                          style: TextButton.styleFrom(
+                            backgroundColor: Color(0xFFF5F3FF),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                     ],
 
-                    Container(
-                      decoration: BoxDecoration(
-                        color: cardSurface,
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
+                    // Section 1: Personal Information
+                    _buildAccordionSection(
+                      index: 0,
+                      title: "1. Personal Information",
+                      subtitle: "Enter your business details",
+                      leadingIcon: Icons.person_outline,
+                      child: Column(
+                        children: [
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('Business Name *', _businessNameController, placeholder: 'Enter Business Name', prefixIcon: Icons.store_outlined),
+                            _buildInput('Applicant\'s Name *', _applicantNameController, placeholder: 'As per Aadhaar', prefixIcon: Icons.face_outlined),
                           ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildInput('PAN No. *', _panNoController, placeholder: 'Enter PAN Number', prefixIcon: Icons.credit_card_outlined),
+                            _buildInput('Aadhaar Number *', _aadhaarNoController, isNum: true, placeholder: 'Enter Aadhaar Number', prefixIcon: Icons.badge_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildResponsiveRow(
+                            context,
+                            _buildDateField('Business Est. Date *', _businessEstDateController, prefixIcon: Icons.calendar_today_outlined),
+                            _buildInput('Business Address *', _businessAddressController, placeholder: 'Enter Business Address', prefixIcon: Icons.location_on_outlined),
+                          ),
+                          const SizedBox(height: 14),
+                          _buildInput('Aadhaar Address *', _aadhaarAddressController, placeholder: 'As per Aadhaar card', prefixIcon: Icons.home_outlined),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // SECTION 1: Personal Information (Matching User Screenshot Exactly)
-                          _buildHeaderBanner('1. Personal Information.'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('Business Name *', _businessNameController, placeholder: 'BUSINESS NAME'),
-                                  _buildInput('Applicant\'s Name *', _applicantNameController, placeholder: 'AS PER AADHAAR'),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildInput('PAN No. *', _panNoController, placeholder: 'PAN NO.'),
-                                  _buildInput('Aadhaar Number *', _aadhaarNoController, isNum: true, placeholder: 'AADHAAR NUMBER'),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildResponsiveRow(
-                                  context,
-                                  _buildDateField('Business Est. Date *', _businessEstDateController),
-                                  _buildInput('Business Address *', _businessAddressController, placeholder: 'BUSS. ADDRESS'),
-                                ),
-                                const SizedBox(height: 14),
-                                _buildInput('Aadhaar Address *', _aadhaarAddressController, placeholder: 'AS PER AADHAAR'),
-                              ],
-                            ),
-                          ),
+                    ),
 
-                          // SECTION 2: Contact Information
-                          _buildHeaderBanner('2. Contact Information.'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                bool isWide = constraints.maxWidth > 700;
-                                final stateList = _deliveryStates.isNotEmpty
-                                    ? _deliveryStates
-                                    : [
-                                        "Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli","Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Pondicherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"
-                                      ];
-                                return isWide
-                                    ? Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(child: _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER')),
-                                          const SizedBox(width: 12),
-                                          Expanded(child: _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID')),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: _statesLoading
-                                                ? const Padding(
-                                                    padding: EdgeInsets.only(top: 24),
-                                                    child: Row(children: [
-                                                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryTeal)),
-                                                      SizedBox(width: 8),
-                                                      Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
-                                                    ]),
-                                                  )
-                                                : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State'),
-                                          ),
-                                        ],
-                                      )
-                                    : Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'MOBILE NUMBER'),
-                                          const SizedBox(height: 12),
-                                          _buildInput('Email ID *', _emailIdController, placeholder: 'Email ID'),
-                                          const SizedBox(height: 12),
-                                          _statesLoading
-                                              ? const Padding(
-                                                  padding: EdgeInsets.symmetric(vertical: 8),
-                                                  child: Row(children: [
-                                                    SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryTeal)),
-                                                    SizedBox(width: 8),
-                                                    Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
-                                                  ]),
-                                                )
-                                              : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State'),
-                                        ],
-                                      );
-                              },
-                            ),
-                          ),
-
-                          // SECTION 3: Account Information
-                          _buildHeaderBanner('3. Account Information.'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                bool isWide = constraints.maxWidth > 750;
-                                final accTypes = _accountTypes.isNotEmpty
-                                    ? _accountTypes
-                                    : ['Savings A/c', 'Current A/c'];
-                                return isWide
-                                    ? Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Expanded(child: _buildInput('Bank Name', _bankNameController, placeholder: 'BANK NAME')),
-                                          const SizedBox(width: 10),
-                                          Expanded(child: _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account No.')),
-                                          const SizedBox(width: 10),
-                                          Expanded(child: _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC CODE')),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Account Type'),
-                                          ),
-                                        ],
-                                      )
-                                    : Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildInput('Bank Name', _bankNameController, placeholder: 'BANK NAME'),
-                                          const SizedBox(height: 12),
-                                          _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account No.'),
-                                          const SizedBox(height: 12),
-                                          _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC CODE'),
-                                          const SizedBox(height: 12),
-                                          _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Account Type'),
-                                        ],
-                                      );
-                              },
-                            ),
-                          ),
-
-                          // SECTION 4: Upload Document (Matching Screenshot 2 UI)
-                          _buildHeaderBanner('4. Upload Document.'),
-                          Padding(
-                            padding: const EdgeInsets.all(18.0),
-                            child: Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: cardSurface,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Upload Files',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textDarkHeading),
-                                  ),
-                                  const SizedBox(height: 14),
-
-                                  // Top Drop Zone Box
-                                  InkWell(
-                                    onTap: () {
-                                      final requiredKeys = ['doc_aadhaar', 'doc_pan', 'doc_cheque'];
-                                      final firstEmpty = requiredKeys.firstWhere((k) => !_uploadedDocs.containsKey(k), orElse: () => 'doc_aadhaar');
-                                      _pickFile(firstEmpty);
-                                    },
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: const Color(0xFFCBD5E1)),
-                                      ),
-                                      child: const Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(Icons.cloud_upload_outlined, size: 40, color: Color(0xFF64748B)),
-                                          SizedBox(height: 8),
-                                          Text(
-                                            'Drop file here or browse',
-                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: textDarkHeading),
-                                          ),
-                                          SizedBox(height: 4),
-                                          Text(
-                                            'PDF, PNG, JPG up to 2MB',
-                                            style: TextStyle(fontSize: 11.5, color: textSubdued, fontWeight: FontWeight.w500),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-
-                                  // Required Document Upload Cards
-                                  _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
-                                  _buildDocUploadCard('PAN Card *', 'doc_pan'),
-                                  _buildDocUploadCard('Cancel Cheque / Bank Statement *', 'doc_cheque'),
-                                ],
-                              ),
-                            ),
-                          ),
-
-                          // SECTION 5: Payment
-                          _buildHeaderBanner('5. Payment'),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 18),
-                            child: Column(
-                              children: [
-                                Center(
-                                  child: Text(
-                                    'Total Payable Amount is ₹${_payableAmount.toStringAsFixed(2)}/-',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      color: textDarkHeading,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Center(
-                                  child: SizedBox(
-                                    width: 160,
-                                    height: 46,
-                                    child: ElevatedButton(
-                                      onPressed: _loading ? null : _submitMsmeForm,
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: primaryTeal,
-                                        foregroundColor: Colors.white,
-                                        elevation: 2,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      ),
-                                      child: _loading
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    // Section 2: Contact Information
+                    _buildAccordionSection(
+                      index: 1,
+                      title: "2. Contact Information",
+                      subtitle: "Provide details for verification",
+                      leadingIcon: Icons.contact_mail_outlined,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          bool isWide = constraints.maxWidth > 700;
+                          final stateList = _deliveryStates.isNotEmpty ? _deliveryStates : ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli","Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Pondicherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
+                          return isWide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'Mobile Number', prefixIcon: Icons.phone_android_outlined)),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: _buildInput('Email ID *', _emailIdController, placeholder: 'Enter Email ID', prefixIcon: Icons.mail_outline)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: _statesLoading
+                                          ? const Padding(
+                                              padding: EdgeInsets.only(top: 28),
+                                              child: Row(children: [
+                                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple)),
+                                                SizedBox(width: 8),
+                                                Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
+                                              ]),
                                             )
-                                          : const Text(
-                                              'Submit',
-                                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                                            ),
+                                          : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State', prefixIcon: Icons.map_outlined),
                                     ),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInput('Mobile Number *', _mobileNumberController, isNum: true, placeholder: 'Mobile Number', prefixIcon: Icons.phone_android_outlined),
+                                    const SizedBox(height: 12),
+                                    _buildInput('Email ID *', _emailIdController, placeholder: 'Enter Email ID', prefixIcon: Icons.mail_outline),
+                                    const SizedBox(height: 12),
+                                    _statesLoading
+                                        ? const Padding(
+                                            padding: EdgeInsets.symmetric(vertical: 8),
+                                            child: Row(children: [
+                                              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple)),
+                                              SizedBox(width: 8),
+                                              Text('Loading states…', style: TextStyle(fontSize: 12, color: textSubdued)),
+                                            ]),
+                                          )
+                                        : _buildDropdownField('Delivery State *', _deliveryState, stateList, (v) => setState(() => _deliveryState = v), hint: 'Select State', prefixIcon: Icons.map_outlined),
+                                  ],
+                                );
+                        },
+                      ),
+                    ),
+
+                    // Section 3: Account Information
+                    _buildAccordionSection(
+                      index: 2,
+                      title: "3. Account Information",
+                      subtitle: "Bank details for verification",
+                      leadingIcon: Icons.account_balance_wallet_outlined,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          bool isWide = constraints.maxWidth > 750;
+                          final accTypes = _accountTypes.isNotEmpty ? _accountTypes : ['Savings A/c', 'Current A/c'];
+                          return isWide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: _buildInput('Bank Name', _bankNameController, placeholder: 'Enter Bank Name', prefixIcon: Icons.account_balance_outlined)),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account Number', prefixIcon: Icons.numbers_outlined)),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC Code', prefixIcon: Icons.qr_code_outlined)),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Type', prefixIcon: Icons.view_list_outlined),
+                                    ),
+                                  ],
+                                )
+                              : Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildInput('Bank Name', _bankNameController, placeholder: 'Enter Bank Name', prefixIcon: Icons.account_balance_outlined),
+                                    const SizedBox(height: 12),
+                                    _buildInput('Account No.', _accountNoController, isNum: true, placeholder: 'Account Number', prefixIcon: Icons.numbers_outlined),
+                                    const SizedBox(height: 12),
+                                    _buildInput('IFSC Code', _ifscCodeController, placeholder: 'IFSC Code', prefixIcon: Icons.qr_code_outlined),
+                                    const SizedBox(height: 12),
+                                    _buildDropdownField('Account Type', _accountType, accTypes, (v) => setState(() => _accountType = v), hint: 'Select Type', prefixIcon: Icons.view_list_outlined),
+                                  ],
+                                );
+                        },
+                      ),
+                    ),
+
+                    // Section 4: Upload Document
+                    _buildAccordionSection(
+                      index: 3,
+                      title: "4. Upload Document",
+                      subtitle: "Upload file proofs (Max 2MB)",
+                      leadingIcon: Icons.cloud_upload_outlined,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFAFAFA),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                final requiredKeys = ['doc_aadhaar', 'doc_pan', 'doc_cheque'];
+                                final firstEmpty = requiredKeys.firstWhere((k) => !_uploadedDocs.containsKey(k), orElse: () => 'doc_aadhaar');
+                                _pickFile(firstEmpty);
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: primaryPurple.withValues(alpha: 0.2), style: BorderStyle.solid),
+                                ),
+                                child: const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.cloud_upload_outlined, size: 36, color: primaryPurple),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'Browse files to upload',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'PDF, PNG, JPG up to 2MB',
+                                      style: TextStyle(fontSize: 11, color: textSubdued),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            _buildDocUploadCard('Aadhaar Card *', 'doc_aadhaar'),
+                            _buildDocUploadCard('PAN Card *', 'doc_pan'),
+                            _buildDocUploadCard('Cancel Cheque / Bank Statement *', 'doc_cheque'),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Section 5: Payment
+                    _buildAccordionSection(
+                      index: 4,
+                      title: "5. Payment Information",
+                      subtitle: "Review pricing & pay securely",
+                      leadingIcon: Icons.payment_outlined,
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F3FF),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'MSME Processing Fee',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      const Text(
+                                        'Govt Registration Charges Included',
+                                        style: TextStyle(fontSize: 11, color: textSubdued),
+                                      ),
+                                    ],
                                   ),
+                                ),
+                                Text(
+                                  '₹${_payableAmount.toStringAsFixed(2)}',
+                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: primaryPurple),
                                 ),
                               ],
                             ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              const Icon(Icons.shield_outlined, color: Colors.green, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Payments are secure and encrypted.',
+                                  style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -725,33 +1032,119 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
               ),
             ),
           ),
+          
+          // Sticky Bottom Gradient Button
+          SafeArea(
+            top: false,
+            child: _buildBottomActionButton(
+              title: buttonTitle,
+              subtitle: buttonSubtitle,
+              leftIcon: buttonIcon,
+              onTap: () {
+                if (_expandedSectionIndex >= 0 && _expandedSectionIndex < 4) {
+                  // Switch to next step
+                  setState(() {
+                    _expandedSectionIndex++;
+                  });
+                } else if (_expandedSectionIndex == -1) {
+                  // Reopen first step
+                  setState(() {
+                    _expandedSectionIndex = 0;
+                  });
+                } else {
+                  _submitMsmeForm();
+                }
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderBanner(String title) {
+  Widget _buildBottomActionButton({
+    required String title,
+    required String subtitle,
+    required IconData leftIcon,
+    required VoidCallback onTap,
+  }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [headerGradientStart, headerGradientEnd],
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [primaryPurple, secondaryPurple],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: primaryPurple.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.3,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(leftIcon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward,
+                    color: primaryPurple,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -788,6 +1181,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     bool isNum = false,
     int? maxLength,
     String? placeholder,
+    IconData? prefixIcon,
   }) {
     final isReq = label.contains('*');
     final cleanLabel = label.replaceAll('*', '').trim();
@@ -798,25 +1192,27 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           keyboardType: isNum ? TextInputType.number : TextInputType.text,
           maxLength: maxLength,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            fillColor: const Color(0xFFF8FAFC),
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: primaryTeal, width: 1.8)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
           ),
           validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
         ),
@@ -824,7 +1220,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     );
   }
 
-  Widget _buildDateField(String label, TextEditingController controller) {
+  Widget _buildDateField(String label, TextEditingController controller, {IconData? prefixIcon}) {
     final isReq = label.contains('*');
     final cleanLabel = label.replaceAll('*', '').trim();
 
@@ -834,11 +1230,11 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         TextFormField(
           controller: controller,
           readOnly: true,
@@ -854,16 +1250,18 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
               setState(() => controller.text = formatted);
             }
           },
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
           decoration: InputDecoration(
             hintText: 'DD-MM-YYYY',
-            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
-            suffixIcon: const Icon(Icons.calendar_month, size: 18, color: primaryTeal),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            fillColor: const Color(0xFFF8FAFC),
+            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            suffixIcon: const Icon(Icons.calendar_month, size: 20, color: primaryPurple),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
           ),
           validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
         ),
@@ -871,7 +1269,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     );
   }
 
-  Widget _buildDropdownField(String label, String? value, List<String> items, ValueChanged<String?> onChanged, {String hint = 'Please Select'}) {
+  Widget _buildDropdownField(String label, String? value, List<String> items, ValueChanged<String?> onChanged, {String hint = 'Please Select', IconData? prefixIcon}) {
     final isReq = label.contains('*');
     final cleanLabel = label.replaceAll('*', '').trim();
 
@@ -881,24 +1279,26 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
         Text.rich(
           TextSpan(
             text: cleanLabel,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textLabelDark),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
             children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           initialValue: (value != null && items.contains(value)) ? value : null,
-          hint: Text(hint, style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          hint: Text(hint, style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
           isExpanded: true,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textDarkHeading),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            fillColor: const Color(0xFFF8FAFC),
+            prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            fillColor: const Color(0xFFFAFAFA),
             filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
           ),
-          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, overflow: TextOverflow.ellipsis))).toList(),
+          items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: textDarkHeading), overflow: TextOverflow.ellipsis))).toList(),
           onChanged: onChanged,
           validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
         ),
@@ -912,83 +1312,69 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
     final file = hasFile ? docs.first : null;
     final fileName = file != null ? (file['name'] ?? '') : '';
     final fileSize = file != null ? (file['size'] as int? ?? 0) : 0;
-    final bytes = file != null ? (file['bytes'] as Uint8List?) : null;
-    final ext = file != null ? (file['extension'] as String? ?? '').toLowerCase() : '';
-
-    final isPdf = ext == 'pdf';
-    final isImg = ext == 'jpg' || ext == 'jpeg' || ext == 'png';
+    
+    final isReq = title.contains('*');
+    final cleanTitle = title.replaceAll('*', '').trim();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: hasFile ? primaryTeal.withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: hasFile ? primaryPurple.withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          // Left Badge Icon
           Container(
-            width: 44,
-            height: 44,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: isPdf
-                  ? const Color(0xFFFFE5E5)
-                  : (isImg ? const Color(0xFFE0F2FE) : const Color(0xFFF1F5F9)),
-              borderRadius: BorderRadius.circular(10),
+              gradient: LinearGradient(
+                colors: docKey.contains('photo') ? const [Color(0xFF6366F1), Color(0xFF3B82F6)] : 
+                        docKey.contains('aadhaar') ? const [Color(0xFFEF4444), Color(0xFFDC2626)] :
+                        docKey.contains('pan') ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)] :
+                        const [Color(0xFF6366F1), Color(0xFF4F46E5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
             ),
-            alignment: Alignment.center,
-            child: bytes != null && isImg
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.memory(bytes, width: 44, height: 44, fit: BoxFit.cover),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isPdf
-                          ? const Color(0xFFEF4444)
-                          : (isImg ? const Color(0xFF0284C7) : const Color(0xFF64748B)),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      isPdf ? 'PDF' : (isImg ? 'IMG' : 'DOC'),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+            child: Icon(
+              docKey.contains('photo') ? Icons.person : 
+              docKey.contains('aadhaar') ? Icons.credit_card :
+              Icons.credit_card, 
+              color: Colors.white, size: 24
+            ),
           ),
           const SizedBox(width: 14),
-
-          // Middle File Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hasFile ? fileName : title,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: textDarkHeading),
+                Text.rich(
+                  TextSpan(
+                    text: hasFile ? fileName : cleanTitle,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textDarkHeading),
+                    children: (!hasFile && isReq) ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  hasFile ? '$title • ${_formatBytes(fileSize)}' : 'File size must be under 2MB',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: hasFile ? FontWeight.w600 : FontWeight.w500,
-                    color: hasFile ? primaryTeal : textSubdued,
+                  hasFile ? 'Uploaded • ${_formatBytes(fileSize)}' : 'PDF, PNG, JPG up to 2MB',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: textSubdued,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -997,25 +1383,25 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
             ),
           ),
           const SizedBox(width: 10),
-
-          // Right Trash icon or Browse button
           if (hasFile)
             IconButton(
               onPressed: () => _removeFile(docKey),
-              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF94A3B8), size: 22),
+              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF94A3B8), size: 24),
               tooltip: 'Remove file',
             )
           else
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () => _pickFile(docKey),
+              icon: const Icon(Icons.upload_rounded, size: 16),
+              label: const Text('Upload', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF1F5F9),
-                foregroundColor: textDarkHeading,
+                backgroundColor: primaryPurple.withValues(alpha: 0.1),
+                foregroundColor: primaryPurple,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                minimumSize: const Size(0, 36),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Browse', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
             ),
         ],
       ),
@@ -1047,7 +1433,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
                 width: 72,
                 height: 72,
                 decoration: const BoxDecoration(
-                  color: primaryTeal,
+                  color: primaryPurple,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.check, color: Colors.white, size: 42),
@@ -1067,8 +1453,9 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 decoration: BoxDecoration(
-                  color: primaryTeal.withValues(alpha: 0.1),
+                  color: const Color(0xFFF5F3FF),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children: [
@@ -1076,7 +1463,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
                     const SizedBox(height: 4),
                     Text(
                       _trackingId ?? '',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryTeal, letterSpacing: 0.5),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryPurple, letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -1088,7 +1475,7 @@ class _MsmeServiceScreenState extends State<MsmeServiceScreen>
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryTeal,
+                    backgroundColor: primaryPurple,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),

@@ -524,8 +524,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 30),
-              Image.asset('assets/Empty.png', height: 140, fit: BoxFit.contain),
             ],
           ),
         ),
