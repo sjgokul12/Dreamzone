@@ -21,7 +21,15 @@ class BusApiService {
       final res = await http
           .get(Uri.parse('$_productionBaseUrl$pathWithQuery'))
           .timeout(Duration(seconds: timeoutSeconds));
-      return json.decode(res.body) as Map<String, dynamic>;
+      final decoded = json.decode(res.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      } else if (decoded is List) {
+        return {'apiAvailableBuses': decoded};
+      }
+      return {'data': decoded};
     } catch (e) {
       throw Exception('Server unreachable: $e');
     }
@@ -37,7 +45,15 @@ class BusApiService {
             body: json.encode(body),
           )
           .timeout(Duration(seconds: timeoutSeconds));
-      return json.decode(res.body) as Map<String, dynamic>;
+      final decoded = json.decode(res.body);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      } else if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      } else if (decoded is List) {
+        return {'data': decoded};
+      }
+      return {'data': decoded};
     } catch (e) {
       throw Exception('Server unreachable: $e');
     }

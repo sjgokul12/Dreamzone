@@ -18,7 +18,7 @@ class TermsScreen extends StatelessWidget {
         _Section(title: '4. Payment Terms', content: 'All fees are displayed before submission. Payments are processed securely. Refund policies vary by service type.'),
         _Section(title: '5. Privacy', content: 'Your data is protected under our Privacy Policy. We do not share personal information without consent.'),
         _Section(title: '6. Limitation of Liability', content: 'DZI Infinity acts as a facilitator. We are not liable for delays caused by government agencies or third parties.'),
-        _Section(title: '7. Contact', content: 'Email: dreamzone.infinity@gmail.com\nPhone: +91 9986074786'),
+        _Section(title: '7. Contact', content: 'Email: dreamzone.infinity@gmail.com\nPhone: +91 9880885551'),
       ])),
     );
   }

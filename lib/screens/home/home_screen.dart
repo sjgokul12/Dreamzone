@@ -58,12 +58,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
-  late AnimationController _mainAnimationController;
+  bool _isCallDropdownExpanded = false;
+  bool _isEmailDropdownExpanded = false;
+
   late AnimationController _pulseController;
   late AnimationController _partnerMarqueeController;
   late AnimationController _floatAnimationController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
 
   // Design Tokens
   static const Color kAccentPurple = Color(0xFF7C3AED);
@@ -73,19 +73,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   List<Map<String, dynamic>> get _homeServices {
     final defaultOrder = [
-      {'id': 'aadhaar', 'name': 'Aadhaar', 'category': 'E-Government', 'icon': 'fingerprint', 'color': '#D97706'},
-      {'id': 'pan', 'name': 'PAN', 'category': 'E-Government', 'icon': 'description', 'color': '#2563EB'},
-      {'id': 'gst', 'name': 'GST', 'category': 'E-Government', 'icon': 'receipt_long', 'color': '#059669'},
-      {'id': 'voter', 'name': 'Voter ID', 'category': 'E-Government', 'icon': 'how_to_vote', 'color': '#7C3AED'},
-      {'id': 'fastag_purchase', 'name': 'Fastag', 'category': 'Home Product', 'asset_image': 'assets/Fastag Purchase.png', 'icon': 'directions_car', 'color': '#00A896'},
-      {'id': 'landline_bbps', 'name': 'Landline', 'category': 'BBPS Services', 'asset_image': 'assets/Landline.jpg', 'icon': 'phone_in_talk', 'color': '#2563EB'},
+      {'id': 'pan', 'name': 'PAN', 'category': 'Home Product', 'icon': 'description', 'color': '#2563EB', 'asset_image': 'assets/PAN.png'},
+      {'id': 'gst', 'name': 'GST', 'category': 'Home Product', 'icon': 'receipt_long', 'color': '#059669', 'asset_image': 'assets/GST.png'},
+      {'id': 'msme', 'name': 'MSME', 'category': 'Home Product', 'icon': 'business', 'color': '#8B5CF6', 'asset_image': 'assets/MSME.png'},
+      {'id': 'aadhaar', 'name': 'Aadhaar', 'category': 'Home Product', 'icon': 'fingerprint', 'color': '#D97706', 'asset_image': 'assets/Aadhaar.png'},
+      {'id': 'travel_bus', 'name': 'Bus Booking', 'category': 'Travels', 'icon': 'directions_bus', 'color': '#EC4899', 'asset_image': 'assets/Bus booking.png'},
+      {'id': 'recharge', 'name': 'Mobile Recharge', 'category': 'BBPS Services', 'asset_image': 'assets/Postpaid Mobile Recharges.png', 'icon': 'phone_android', 'color': '#059669'},
     ];
 
     final result = <Map<String, dynamic>>[];
     for (final item in defaultOrder) {
       final nameKey = item['name'].toString().toLowerCase().split(' ').first;
+      final itemId = item['id'].toString().toLowerCase();
       final match = _allServices.firstWhere(
-        (s) => (s['name'] ?? '').toString().toLowerCase().contains(nameKey),
+        (s) => (s['name'] ?? '').toString().toLowerCase().contains(nameKey) ||
+               (s['id'] ?? '').toString().toLowerCase() == itemId,
         orElse: () => item,
       );
       result.add(match);
@@ -94,14 +96,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheAssets();
+  }
+
+  void _precacheAssets() {
+    try {
+      const assetImages = [
+        'assets/Backgrounddzi.png',
+        'assets/Aadhaar.png',
+        'assets/PAN.png',
+        'assets/GST.png',
+        'assets/Voter.png',
+        'assets/Fastag Purchase.png',
+        'assets/Fastag.png',
+        'assets/Landline.png',
+        'assets/Call ful.png',
+      ];
+      for (final asset in assetImages) {
+        precacheImage(AssetImage(asset), context).catchError((_) {});
+      }
+    } catch (_) {}
+  }
+
+  @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
-
-    _mainAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 2000),
@@ -118,22 +140,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
     )..repeat(reverse: true);
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _mainAnimationController, curve: Curves.easeOut),
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(parent: _mainAnimationController, curve: Curves.easeOutBack),
-    );
-
-    _mainAnimationController.forward();
     _loadData();
   }
 
   @override
   void dispose() {
     _homeScrollController.dispose();
-    _mainAnimationController.dispose();
     _pulseController.dispose();
     _partnerMarqueeController.dispose();
     _floatAnimationController.dispose();
@@ -141,8 +153,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> _handleCallSupport() async {
-    final uri = Uri.parse('tel:+919986074786');
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final uri = Uri.parse('tel:$phoneNumber');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
@@ -150,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Helpline: +91 9986074786'),
+              content: Text('Helpline: $phoneNumber'),
               behavior: SnackBarBehavior.floating,
               backgroundColor: const Color(0xFF7C3AED),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -162,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Helpline: +91 9986074786'),
+            content: Text('Helpline: $phoneNumber'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF7C3AED),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -172,25 +184,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _handleChatSupport() async {
-    final uri = Uri.parse('https://wa.me/919986074786?text=Hello%20DreamZone%20Support%2C%20I%20need%20assistance');
+  Future<void> _openWhatsApp(String phoneNumber) async {
+    final cleanPhone = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    final uri = Uri.parse('https://wa.me/$cleanPhone?text=Hello%20DreamZone%20Support%2C%20I%20need%20assistance');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
-        if (mounted) {
-          _navigateWithAnimation(const HelpSupportScreen());
+        final fallbackUri = Uri.parse('whatsapp://send?phone=$cleanPhone');
+        if (await canLaunchUrl(fallbackUri)) {
+          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('WhatsApp Helpline: +91 9880885551'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF10B981),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
         }
       }
     } catch (_) {
       if (mounted) {
-        _navigateWithAnimation(const HelpSupportScreen());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('WhatsApp Helpline: +91 9880885551'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF10B981),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
       }
     }
   }
 
-  Future<void> _handleEmailSupport() async {
-    final uri = Uri.parse('mailto:care@dreamzoneindia.in?subject=Assistance%20Request%20-%20DZI%20App');
+  Future<void> _sendEmail(String email) async {
+    final uri = Uri.parse('mailto:$email?subject=Assistance%20Request%20-%20DZI%20App');
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
@@ -198,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Email: care@dreamzoneindia.in'),
+              content: Text('Support Email: $email'),
               behavior: SnackBarBehavior.floating,
               backgroundColor: const Color(0xFF2563EB),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -210,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Email: care@dreamzoneindia.in'),
+            content: Text('Support Email: $email'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF2563EB),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -218,6 +248,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         );
       }
     }
+  }
+
+  void _copyToClipboard(String text, String message) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF1E1B4B),
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
   }
 
   String _normalizeCategory(String? cat) {
@@ -1049,37 +1103,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       color: kAccentPurple,
       backgroundColor: Colors.white,
       onRefresh: () async => _loadData(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SingleChildScrollView(
-            controller: _homeScrollController,
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildCurvedHeaderSection(isGuest),
-                _buildSearchBarOverlay(),
-                _buildSectionTitle('Premium Services', onViewAll: _viewAllServices),
-                const SizedBox(height: 16),
-                RepaintBoundary(child: _buildServicesGrid()),
-                const SizedBox(height: 32),
-                _buildSectionTitle('Why Choose Us'),
-                const SizedBox(height: 16),
-                RepaintBoundary(child: _buildWhyChooseUs()),
-                const SizedBox(height: 32),
-                RepaintBoundary(child: _buildStatsWithAnimation()),
-                const SizedBox(height: 32),
-                _buildPoweredByPlatform(),
-                const SizedBox(height: 54),
-                const RepaintBoundary(child: CustomerReviewsSection()),
-                const SizedBox(height: 48),
-                RepaintBoundary(child: _buildContactCTA()),
-                const SizedBox(height: 100),
-              ],
-            ),
-          ),
+      child: SingleChildScrollView(
+        controller: _homeScrollController,
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildCurvedHeaderSection(isGuest),
+            _buildSearchBarOverlay(),
+            _buildSectionTitle('Premium Services', onViewAll: _viewAllServices),
+            const SizedBox(height: 16),
+            RepaintBoundary(child: _buildServicesGrid()),
+            const SizedBox(height: 32),
+            _buildSectionTitle('Why Choose Us'),
+            const SizedBox(height: 16),
+            RepaintBoundary(child: _buildWhyChooseUs()),
+            const SizedBox(height: 32),
+            RepaintBoundary(child: _buildStatsWithAnimation()),
+            const SizedBox(height: 32),
+            _buildPoweredByPlatform(),
+            const SizedBox(height: 54),
+            const RepaintBoundary(child: CustomerReviewsSection()),
+            const SizedBox(height: 48),
+            RepaintBoundary(child: _buildContactCTA()),
+            const SizedBox(height: 100),
+          ],
         ),
       ),
     );
@@ -2036,7 +2084,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (lower.contains('aadhaar')) assetPath = 'assets/Aadhaar.png';
     if (lower.contains('pan')) assetPath = 'assets/PAN.png';
     if (lower.contains('gst')) assetPath = 'assets/GST.png';
-    if (lower.contains('voter')) assetPath = 'assets/Voter card.png';
+    if (lower.contains('voter')) assetPath = 'assets/Voter.png';
     if (lower.contains('fastag')) assetPath = 'assets/Fastag.png';
     if (lower.contains('landline')) assetPath = 'assets/Landline.png';
     if (lower.contains('dth')) assetPath = 'assets/DTH.png';
@@ -2548,32 +2596,431 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 22),
 
-          // 3 Support Interactive Cards with 3D Animated Badges
-          _buildSupportCard(
+          // 1. Call Us (Expandable Dropdown with 9880885551)
+          _buildExpandableSupportCard(
             title: 'Call Us',
-            subtitle: 'Speak with our support executive',
+            subtitle: _isCallDropdownExpanded ? 'Helpline: +91 9880885551' : 'Click to view helpline number',
             iconType: _SupportIconType.phone,
             accentColor: const Color(0xFF7C3AED),
-            onTap: _handleCallSupport,
+            isExpanded: _isCallDropdownExpanded,
+            onToggle: () {
+              setState(() {
+                _isCallDropdownExpanded = !_isCallDropdownExpanded;
+              });
+            },
+            dropdownContent: _buildCallDropdownContent(),
           ),
           const SizedBox(height: 12),
+
+          // 2. WhatsApp (Direct click opens WhatsApp to 9880885551 with NO dropdown)
           _buildSupportCard(
-            title: 'Live Chat',
-            subtitle: 'Chat live with our support team',
-            iconType: _SupportIconType.chat,
+            title: 'WhatsApp',
+            subtitle: 'Chat directly on +91 9880885551',
+            iconType: _SupportIconType.whatsapp,
             accentColor: const Color(0xFF10B981),
             isOnline: true,
-            onTap: _handleChatSupport,
+            onTap: () => _openWhatsApp('9880885551'),
           ),
           const SizedBox(height: 12),
-          _buildSupportCard(
-            title: 'Email Support',
-            subtitle: 'Drop us an email and we’ll get back to you',
+
+          // 3. Gmail Support (Expandable Dropdown with dreamzone.infinity@gmail.com)
+          _buildExpandableSupportCard(
+            title: 'Gmail Support',
+            subtitle: _isEmailDropdownExpanded ? 'dreamzone.infinity@gmail.com' : 'Click to view support email',
             iconType: _SupportIconType.email,
             accentColor: const Color(0xFF2563EB),
-            onTap: _handleEmailSupport,
+            isExpanded: _isEmailDropdownExpanded,
+            onToggle: () {
+              setState(() {
+                _isEmailDropdownExpanded = !_isEmailDropdownExpanded;
+              });
+            },
+            dropdownContent: _buildEmailDropdownContent(),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCallDropdownContent() {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAF5FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE9D5FF), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFF7C3AED), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Direct Helpline Number',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6B21A8),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '+91 9880885551',
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF1E1B4B),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  onPressed: () => _makePhoneCall('+919880885551'),
+                  icon: const Icon(Icons.call_rounded, size: 16, color: Colors.white),
+                  label: const Text(
+                    'Call Now',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C3AED),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: () => _copyToClipboard('9880885551', 'Helpline number copied!'),
+                  icon: const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF7C3AED)),
+                  label: const Text(
+                    'Copy',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF7C3AED)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFC084FC), width: 1.2),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: const [
+              Icon(Icons.schedule_rounded, size: 13, color: Color(0xFF9333EA)),
+              SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  'Available Mon - Sat | 9:00 AM - 7:00 PM',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF7E22CE),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmailDropdownContent() {
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFBFDBFE), width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.mail_rounded, color: Color(0xFF2563EB), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Official Support Email',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'dreamzone.infinity@gmail.com',
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E1B4B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: ElevatedButton.icon(
+                  onPressed: () => _sendEmail('dreamzone.infinity@gmail.com'),
+                  icon: const Icon(Icons.send_rounded, size: 15, color: Colors.white),
+                  label: const Text(
+                    'Send Email',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: () => _copyToClipboard('dreamzone.infinity@gmail.com', 'Email copied!'),
+                  icon: const Icon(Icons.copy_rounded, size: 14, color: Color(0xFF2563EB)),
+                  label: const Text(
+                    'Copy',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFF2563EB)),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF93C5FD), width: 1.2),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: const [
+              Icon(Icons.bolt_rounded, size: 14, color: Color(0xFF2563EB)),
+              SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  'Average response within 2-4 business hours',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF1E40AF),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpandableSupportCard({
+    required String title,
+    required String subtitle,
+    required _SupportIconType iconType,
+    required Color accentColor,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+    required Widget dropdownContent,
+    bool isOnline = false,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isExpanded ? accentColor.withValues(alpha: 0.4) : const Color(0xFFF1F5F9),
+          width: isExpanded ? 1.5 : 1.3,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isExpanded
+                ? accentColor.withValues(alpha: 0.08)
+                : const Color(0xFF1E1B4B).withValues(alpha: 0.04),
+            blurRadius: isExpanded ? 20 : 16,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onToggle,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    _build3DSupportIcon(iconType),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1E1B4B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isOnline) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFECFDF5),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF10B981),
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0x6610B981),
+                                              blurRadius: 4,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'Online',
+                                        style: TextStyle(
+                                          color: Color(0xFF059669),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: isExpanded ? accentColor.withValues(alpha: 0.1) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isExpanded ? accentColor.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+                          width: 1,
+                        ),
+                      ),
+                      child: AnimatedRotation(
+                        turns: isExpanded ? 0.25 : 0.0,
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        child: Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          color: accentColor,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: dropdownContent,
+                  crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 260),
+                  sizeCurve: Curves.easeInOutCubic,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2606,7 +3053,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(22),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 _build3DSupportIcon(iconType),
@@ -2687,11 +3134,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
                     color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
                   ),
                   child: Icon(
@@ -2719,10 +3166,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         glowColor = const Color(0xFF7C3AED);
         innerIcon = const Icon(Icons.phone_in_talk_rounded, color: Colors.white, size: 26);
         break;
-      case _SupportIconType.chat:
-        gradientColors = const [Color(0xFF34D399), Color(0xFF059669)];
+      case _SupportIconType.whatsapp:
+        gradientColors = const [Color(0xFF25D366), Color(0xFF128C7E)];
         glowColor = const Color(0xFF10B981);
-        innerIcon = const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 25);
+        innerIcon = const Icon(Icons.chat_rounded, color: Colors.white, size: 25);
         break;
       case _SupportIconType.email:
         gradientColors = const [Color(0xFF60A5FA), Color(0xFF2563EB)];
@@ -2873,7 +3320,7 @@ class _ScrollEntranceCardState extends State<_ScrollEntranceCard>
 
 enum _SupportIconType {
   phone,
-  chat,
+  whatsapp,
   email,
 }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/prepaid_api_service.dart';
 import '../../../../core/payment/razorpay_service.dart';
 import 'postpaid_recharge_screen.dart';
 
@@ -15,26 +16,30 @@ class PrepaidRechargeScreen extends StatefulWidget {
 }
 
 class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
-  static const Color primaryPurple = Color(0xFF8B5CF6);
-  static const Color primaryDark = Color(0xFF1E293B);
+  static const Color primaryPurple = Color(0xFF7C3AED);
+  static const Color primaryDark = Color(0xFF1E1B4B);
   static const Color textSubdued = Color(0xFF64748B);
 
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _mobileCtrl = TextEditingController(text: '+91 ');
+  final TextEditingController _mobileCtrl = TextEditingController();
   final TextEditingController _amountCtrl = TextEditingController();
-  final ApiService _api = ApiService();
 
-  // All data loaded dynamically from Python database API
-  List<Map<String, dynamic>> _operators = [];
-  List<String> _circles = [];
+  // Operator & Circle State
   String? _selectedOperator;
   String? _selectedCircle;
+  String? _detectedOpCode;
+  String? _detectedCircleCode;
 
-  bool _loadingOperators = true;
-  bool _loadingCircles = true;
+  bool _isAutoDetecting = false;
+  bool _autoDetected = false;
+
+  // Plan & R-Offer Loading State
   bool _loadingPlans = false;
+  bool _loadingROffers = false;
   List<Map<String, dynamic>> _livePlans = [];
+  String _selectedCategory = 'All';
 
+  // Submission State
   bool _submitting = false;
   String? _resultStatus;
   String? _resultMessage;
@@ -42,44 +47,33 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
 
   final RazorpayService _razorpayService = RazorpayService();
 
+  // Dynamic Operators & Circles loaded from API / Database
+  List<Map<String, dynamic>> _operators = [];
+  List<String> _circles = [];
+  bool _loadingOperators = false;
+  bool _loadingCircles = false;
+
   @override
   void initState() {
     super.initState();
     _razorpayService.init();
-    _loadDatabaseData();
+    _loadOperatorsAndCircles();
   }
 
-  Future<void> _loadDatabaseData() async {
+  Future<void> _loadOperatorsAndCircles() async {
     setState(() {
       _loadingOperators = true;
       _loadingCircles = true;
     });
 
     try {
-      final results = await Future.wait([
-        _api.getRechargeOperators('prepaid'),
-        _api.getRechargeCircles(),
-      ]);
-
-      final opRes = results[0];
-      final circleRes = results[1];
+      final ops = await PrepaidApiService.fetchOperators(type: 'prepaid');
+      final circs = await PrepaidApiService.fetchCircles();
 
       if (mounted) {
         setState(() {
-          if (opRes['success'] == true && opRes['operators'] != null) {
-            _operators = List<Map<String, dynamic>>.from(opRes['operators']);
-            if (_operators.isNotEmpty && _selectedOperator == null) {
-              _selectedOperator = _operators.first['label'];
-            }
-          }
-
-          if (circleRes['success'] == true && circleRes['circles'] != null) {
-            _circles = List<String>.from(circleRes['circles']);
-            if (_circles.isNotEmpty && _selectedCircle == null) {
-              _selectedCircle = _circles.first;
-            }
-          }
-
+          _operators = ops;
+          _circles = circs;
           _loadingOperators = false;
           _loadingCircles = false;
         });
@@ -102,36 +96,678 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
     super.dispose();
   }
 
+  String get _cleanMobile => _mobileCtrl.text.replaceAll('+91', '').replaceAll(' ', '').trim();
+
+  bool get _canShowActionButtons => _cleanMobile.length == 10 && _selectedOperator != null;
+
   void _onMobileChanged(String value) {
-    String clean = value.replaceAll('+91 ', '').replaceAll(' ', '').trim();
-    if (clean.length == 10 && _operators.isNotEmpty) {
-      final prefix = clean.substring(0, 2);
-      for (final op in _operators) {
-        final label = (op['label'] ?? '').toString().toLowerCase();
-        if (['98', '99', '94'].contains(prefix) && label.contains('airtel')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (['63', '70', '79', '89'].contains(prefix) && label.contains('jio')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (['90', '91', '97'].contains(prefix) && (label.contains('vi') || label.contains('vodafone'))) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (prefix == '94' && label.contains('bsnl')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        }
+    final clean = value.replaceAll('+91', '').replaceAll(' ', '').trim();
+    if (clean.length == 10) {
+      _autoDetectOperatorAndCircle(clean);
+    } else {
+      if (_autoDetected) {
+        setState(() => _autoDetected = false);
       }
     }
   }
 
-  Future<void> _submitRecharge() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _autoDetectOperatorAndCircle(String mobile) async {
+    setState(() => _isAutoDetecting = true);
 
-    if (_selectedOperator == null || _selectedOperator!.isEmpty) {
-      _showSnack('Please select an operator', isError: true);
+    try {
+      final res = await PrepaidApiService.fetchOperatorAndCircle(mobile);
+      if (mounted && res['success'] == true) {
+        final detectedOp = (res['operator'] ?? '').toString().trim();
+        final detectedCircle = (res['circle'] ?? '').toString().trim();
+        final detectedOpCode = (res['opcode'] ?? '').toString().trim();
+        final detectedCircleCode = (res['circle_code'] ?? '').toString().trim();
+
+        setState(() {
+          if (detectedOp.isNotEmpty && detectedOp != 'null') {
+            final match = _operators.firstWhere(
+              (o) {
+                final lbl = (o['label'] ?? o['name'] ?? '').toString().toLowerCase();
+                final code = (o['code'] ?? '').toString().toLowerCase();
+                final d = detectedOp.toLowerCase();
+                return lbl.contains(d) || d.contains(lbl) || code.contains(d) || d.contains(code);
+              },
+              orElse: () => <String, dynamic>{},
+            );
+
+            if (match.isNotEmpty) {
+              _selectedOperator = (match['label'] ?? match['name'])?.toString() ?? detectedOp;
+              _detectedOpCode = (match['spkey'] ?? match['code'] ?? match['id'])?.toString() ?? detectedOpCode;
+            } else {
+              _selectedOperator = detectedOp;
+              _detectedOpCode = detectedOpCode;
+            }
+          }
+
+          if (detectedCircle.isNotEmpty && detectedCircle != 'null') {
+            final matchCirc = _circles.firstWhere(
+              (c) {
+                final cl = c.toLowerCase();
+                final dc = detectedCircle.toLowerCase();
+                return cl.contains(dc) || dc.contains(cl);
+              },
+              orElse: () => detectedCircle,
+            );
+            _selectedCircle = matchCirc;
+            _detectedCircleCode = detectedCircleCode.isNotEmpty ? detectedCircleCode : matchCirc;
+          }
+
+          _autoDetected = true;
+          _isAutoDetecting = false;
+        });
+
+        _showSnack('Auto-detected: $_selectedOperator • $_selectedCircle');
+      } else {
+        if (mounted) setState(() => _isAutoDetecting = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isAutoDetecting = false);
+    }
+  }
+
+  // ==================== 1. FETCH & SHOW R-OFFERS ====================
+  Future<void> _showROffersSheet() async {
+    if (_cleanMobile.length != 10) {
+      _showSnack('Please enter a 10-digit mobile number first', isError: true);
       return;
     }
+
+    setState(() => _loadingROffers = true);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.78,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFEC4899), Color(0xFFF43F5E)]),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Special R-Offers',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryDark),
+                          ),
+                          Text(
+                            'Exclusive personalized deals for +91 $_cleanMobile',
+                            style: const TextStyle(fontSize: 12, color: textSubdued, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded, color: textSubdued),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    future: PrepaidApiService.fetchROffers(
+                      mobileNo: _cleanMobile,
+                      operatorCode: _selectedOperator ?? _detectedOpCode ?? '',
+                    ),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(color: Color(0xFFEC4899)),
+                              SizedBox(height: 12),
+                              Text('Checking live R-Offers from telecom server...', style: TextStyle(color: textSubdued, fontSize: 13)),
+                            ],
+                          ),
+                        );
+                      }
+
+                      final offers = snapshot.data ?? [];
+                      if (offers.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.local_offer_outlined, size: 54, color: Colors.grey.shade300),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'No direct R-Offers for this number',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: primaryDark),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'You can browse all standard recharge plans using the "Browse Plans" button.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: textSubdued, fontSize: 12.5),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.separated(
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: offers.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 10),
+                        itemBuilder: (ctx, idx) {
+                          final o = offers[idx];
+                          final price = o['price']?.toString() ?? '0';
+                          final desc = o['desc']?.toString() ?? '';
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF1F2),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFFECDD3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF43F5E),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '₹$price',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        desc.isNotEmpty ? desc : 'Special R-Offer pack for this number',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: primaryDark,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _amountCtrl.text = price.replaceAll('.0', '');
+                                    });
+                                    Navigator.pop(ctx);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFF43F5E),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text('Select', style: TextStyle(fontWeight: FontWeight.w800)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    setState(() => _loadingROffers = false);
+  }
+
+  // ==================== 2. FETCH & BROWSE MOBILE PLANS ====================
+  Future<void> _showBrowsePlansSheet() async {
+    setState(() => _loadingPlans = true);
+
+    final opCode = _selectedOperator ?? _detectedOpCode ?? '';
+    final circleCode = _detectedCircleCode ?? _selectedCircle ?? '';
+
+    try {
+      final plans = await PrepaidApiService.fetchMobilePlans(
+        operatorCode: opCode,
+        circleCode: circleCode,
+      );
+      if (mounted) {
+        setState(() {
+          _livePlans = plans;
+          _loadingPlans = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingPlans = false);
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setModalState) {
+          final categories = <String>['All'];
+          for (var p in _livePlans) {
+            final cat = (p['category'] ?? 'General').toString();
+            if (!categories.contains(cat)) categories.add(cat);
+          }
+
+          final filteredPlans = _selectedCategory == 'All'
+              ? _livePlans
+              : _livePlans.where((p) => p['category'] == _selectedCategory).toList();
+
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.82,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [primaryPurple, Color(0xFF9333EA)]),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_selectedOperator ?? "Mobile"} Plans',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: primaryDark),
+                          ),
+                          Text(
+                            '${_selectedCircle ?? "All India"} • Live PlanAPI packages',
+                            style: const TextStyle(fontSize: 12, color: textSubdued, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded, color: textSubdued),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Category Filter Chips
+                if (categories.length > 1)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: categories.map((cat) {
+                        final isSel = cat == _selectedCategory;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(
+                              cat,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                                color: isSel ? Colors.white : primaryDark,
+                              ),
+                            ),
+                            selected: isSel,
+                            selectedColor: primaryPurple,
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            showCheckmark: false,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setModalState(() => _selectedCategory = cat);
+                              }
+                            },
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+
+                // Plans List
+                Expanded(
+                  child: filteredPlans.isEmpty
+                      ? Center(
+                          child: Text(
+                            _loadingPlans ? 'Loading live plans...' : 'No plans available for this selection',
+                            style: const TextStyle(color: textSubdued, fontSize: 14),
+                          ),
+                        )
+                      : ListView.separated(
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: filteredPlans.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 10),
+                          itemBuilder: (ctx, idx) {
+                            final p = filteredPlans[idx];
+                            final price = p['price']?.toString() ?? '0';
+                            final validity = p['validity']?.toString() ?? 'Active';
+                            final desc = p['desc']?.toString() ?? '';
+                            final cat = p['category']?.toString() ?? '';
+
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          crossAxisAlignment: WrapCrossAlignment.center,
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            Text(
+                                              '₹$price',
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w900,
+                                                color: primaryDark,
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFEDE9FE),
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                validity,
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: primaryPurple,
+                                                ),
+                                              ),
+                                            ),
+                                            if (cat.isNotEmpty)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE0F2FE),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  cat,
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Color(0xFF0284C7),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        if (desc.isNotEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            desc,
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              color: Color(0xFF475569),
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _amountCtrl.text = price.replaceAll('.0', '');
+                                      });
+                                      Navigator.pop(ctx);
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: primaryPurple,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Select', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showOperatorPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Select Prepaid Operator',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryDark),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close_rounded, color: textSubdued),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_loadingOperators)
+              const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator(color: primaryPurple)))
+            else if (_operators.isEmpty)
+              const Center(child: Padding(padding: EdgeInsets.all(20), child: Text('No operators found in database.', style: TextStyle(color: textSubdued))))
+            else
+              ..._operators.map((op) {
+                final label = (op['label'] ?? op['name'] ?? '').toString();
+                final code = (op['id'] ?? op['code'] ?? '').toString();
+                final isSel = label == _selectedOperator;
+                return ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: primaryPurple.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.cell_tower_rounded, color: primaryPurple, size: 20),
+                  ),
+                  title: Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+                      color: isSel ? primaryPurple : primaryDark,
+                    ),
+                  ),
+                  trailing: isSel ? const Icon(Icons.check_circle_rounded, color: primaryPurple) : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedOperator = label;
+                      _detectedOpCode = (code.isNotEmpty ? code : op['spkey'] ?? op['id'])?.toString();
+                    });
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCirclePicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(context).size.height * 0.65,
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Select Circle / Region',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryDark),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close_rounded, color: textSubdued),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            if (_loadingCircles)
+              const Expanded(child: Center(child: CircularProgressIndicator(color: primaryPurple)))
+            else if (_circles.isEmpty)
+              const Expanded(child: Center(child: Text('No circles found in database.', style: TextStyle(color: textSubdued))))
+            else
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _circles.length,
+                  separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                  itemBuilder: (ctx, idx) {
+                    final c = _circles[idx];
+                    final isSel = c == _selectedCircle;
+                    return ListTile(
+                      title: Text(
+                        c,
+                        style: TextStyle(
+                          fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
+                          color: isSel ? primaryPurple : primaryDark,
+                        ),
+                      ),
+                      trailing: isSel ? const Icon(Icons.check_circle_rounded, color: primaryPurple) : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedCircle = c;
+                          _detectedCircleCode = c;
+                        });
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitRecharge() async {
+    if (!_formKey.currentState!.validate()) return;
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isLoggedIn || auth.userId == null) {
@@ -145,20 +781,14 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
       return;
     }
 
-    final opData = _operators.firstWhere(
-      (o) => o['label'] == _selectedOperator,
-      orElse: () => {'id': _selectedOperator, 'label': _selectedOperator},
-    );
-
     _razorpayService.openPaymentGateway(
       amount: amount,
       description: 'Prepaid Recharge – $_selectedOperator',
       name: 'DZI Infinity',
-      contact: _mobileCtrl.text.replaceAll('+91 ', '').trim(),
+      contact: _cleanMobile,
       onSuccess: (PaymentSuccessResponse response) {
         _doSubmitRecharge(
           auth: auth,
-          opData: opData,
           razorpayPaymentId: response.paymentId ?? '',
         );
       },
@@ -172,7 +802,6 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
 
   Future<void> _doSubmitRecharge({
     required dynamic auth,
-    required dynamic opData,
     required String razorpayPaymentId,
   }) async {
     setState(() {
@@ -183,8 +812,8 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
     try {
       final res = await ApiService.postApi('/recharge', {
         'user_id': auth.userId,
-        'mobile_number': _mobileCtrl.text.replaceAll('+91 ', '').trim(),
-        'operator_id': opData['id'] ?? opData['label'],
+        'mobile_number': _cleanMobile,
+        'operator_id': _detectedOpCode ?? _selectedOperator ?? '',
         'operator_name': _selectedOperator,
         'circle': _selectedCircle ?? '',
         'amount': _amountCtrl.text.trim(),
@@ -231,331 +860,6 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
     );
   }
 
-  void _showOperatorPicker() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Select Prepaid Operator',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryDark),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close_rounded, color: textSubdued),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_operators.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text('No operators found in database.', style: TextStyle(color: textSubdued)),
-                ),
-              )
-            else
-              ..._operators.map((op) {
-                final isSel = op['label'] == _selectedOperator;
-                return ListTile(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  tileColor: isSel ? const Color(0xFFF5F3FF) : Colors.transparent,
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: primaryPurple.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.cell_tower_rounded,
-                      color: primaryPurple,
-                      size: 20,
-                    ),
-                  ),
-                  title: Text(
-                    op['label'] ?? '',
-                    style: TextStyle(
-                      fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                      color: isSel ? primaryPurple : primaryDark,
-                    ),
-                  ),
-                  trailing: isSel
-                      ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedOperator = op['label']);
-                    Navigator.pop(ctx);
-                  },
-                );
-              }),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCirclePicker() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.65,
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Select Circle / Region',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: primaryDark),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close_rounded, color: textSubdued),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            if (_circles.isEmpty)
-              const Expanded(
-                child: Center(
-                  child: Text('No circles found in database.', style: TextStyle(color: textSubdued)),
-                ),
-              )
-            else
-              Expanded(
-                child: ListView.separated(
-                  itemCount: _circles.length,
-                  separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  itemBuilder: (ctx, idx) {
-                    final c = _circles[idx];
-                    final isSel = c == _selectedCircle;
-                    return ListTile(
-                      title: Text(
-                        c,
-                        style: TextStyle(
-                          fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                          color: isSel ? primaryPurple : primaryDark,
-                        ),
-                      ),
-                      trailing: isSel
-                          ? const Icon(Icons.check_circle_rounded, color: primaryPurple)
-                          : null,
-                      onTap: () {
-                        setState(() => _selectedCircle = c);
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showBrowsePlans() async {
-    final opData = _operators.firstWhere(
-      (o) => o['label'] == _selectedOperator,
-      orElse: () => {'code': _selectedOperator ?? '', 'id': _selectedOperator ?? ''},
-    );
-    final opCode = opData['code'] ?? opData['id'] ?? '';
-    final circle = _selectedCircle ?? '';
-
-    setState(() => _loadingPlans = true);
-
-    try {
-      final res = await _api.getRechargePlans(opCode, circle);
-      if (mounted && res['success'] == true && res['plans'] != null) {
-        setState(() {
-          _livePlans = List<Map<String, dynamic>>.from(res['plans']);
-          _loadingPlans = false;
-        });
-      } else {
-        setState(() => _loadingPlans = false);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPlans = false);
-    }
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Browse Prepaid Plans',
-                      style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: primaryDark),
-                    ),
-                    Text(
-                      '${_selectedOperator ?? "Operator"} • ${_selectedCircle ?? "All India"}',
-                      style: const TextStyle(fontSize: 12.5, color: textSubdued, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close_rounded, color: textSubdued),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: _loadingPlans
-                  ? const Center(child: CircularProgressIndicator(color: primaryPurple))
-                  : _livePlans.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No plans available from database for selected operator.',
-                            style: TextStyle(color: textSubdued, fontSize: 13.5),
-                          ),
-                        )
-                      : ListView.builder(
-                          itemCount: _livePlans.length,
-                          itemBuilder: (ctx, idx) {
-                            final p = _livePlans[idx];
-                            final amt = p['amount']?.toString() ?? '0';
-                            final validity = p['validity']?.toString() ?? 'Active';
-                            final data = p['data']?.toString() ?? '';
-                            final desc = p['description']?.toString() ?? p['desc']?.toString() ?? '';
-
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE2E8F0)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              '₹$amt',
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w900,
-                                                color: primaryDark,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFEDE9FE),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                validity,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: primaryPurple,
-                                                ),
-                                              ),
-                                            ),
-                                            if (data.isNotEmpty) ...[
-                                              const SizedBox(width: 6),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFE0F2FE),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  data,
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF0284C7),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                        if (desc.isNotEmpty) ...[
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            desc,
-                                            style: const TextStyle(fontSize: 12.5, color: textSubdued, height: 1.3),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      setState(() => _amountCtrl.text = amt);
-                                      Navigator.pop(ctx);
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: primaryPurple,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      elevation: 0,
-                                    ),
-                                    child: const Text('Select', style: TextStyle(fontWeight: FontWeight.w700)),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -563,9 +867,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(
-            child: _buildHeader(),
-          ),
+          SliverToBoxAdapter(child: _buildHeader()),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -582,7 +884,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
       width: double.infinity,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 10,
-        bottom: 20,
+        bottom: 16,
         left: 16,
         right: 16,
       ),
@@ -593,11 +895,10 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: MediaQuery.of(context).size.width * 0.58,
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -622,64 +923,56 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE9FE),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'PREPAID',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: primaryPurple,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'PREPAID',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: primaryPurple,
+                      letterSpacing: 0.5,
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'Mobile Recharge',
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: primaryDark,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 const Text(
-                  'Instant recharge with live database operators & plans',
+                  'Instant recharge with live PlanAPI offers & packages',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                     color: textSubdued,
                     height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
-          Positioned(
-            right: -15,
-            top: 25,
-            child: Image.asset(
-              'assets/Mobile.png',
-              width: 170,
-              height: 170,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.phone_android_rounded,
-                size: 110,
-                color: Color(0xFFDDD6FE),
-              ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/Mobile.png',
+            width: 110,
+            height: 110,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.phone_android_rounded,
+              size: 80,
+              color: Color(0xFFDDD6FE),
             ),
           ),
         ],
@@ -696,7 +989,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
         border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF7C3AED).withValues(alpha: 0.05),
+            color: primaryPurple.withValues(alpha: 0.05),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -707,16 +1000,14 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Switch to Postpaid tab link
+            // Switch to Postpaid link
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Prepaid Connection',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: primaryDark,
+                const Expanded(
+                  child: Text(
+                    'Prepaid Connection',
+                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: primaryDark),
                   ),
                 ),
                 TextButton.icon(
@@ -729,44 +1020,66 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   icon: const Icon(Icons.sim_card_outlined, size: 16, color: primaryPurple),
                   label: const Text(
                     'Switch to Postpaid',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: primaryPurple,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: primaryPurple),
                   ),
                 ),
               ],
             ),
             const Divider(height: 24, color: Color(0xFFF1F5F9)),
 
-            // 1. Mobile Number
-            const Text(
-              'Mobile Number',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: primaryDark,
-              ),
+            // 1. Mobile Number Input
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Mobile Number',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: primaryDark),
+                ),
+                if (_isAutoDetecting)
+                  const Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
+                      ),
+                      SizedBox(width: 6),
+                      Text('Detecting Operator...', style: TextStyle(fontSize: 11, color: primaryPurple, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             TextFormField(
               controller: _mobileCtrl,
               keyboardType: TextInputType.phone,
+              maxLength: 10,
               onChanged: _onMobileChanged,
               validator: (v) {
-                final clean = (v ?? '').replaceAll('+91 ', '').trim();
+                final clean = (v ?? '').replaceAll('+91', '').replaceAll(' ', '').trim();
                 if (clean.length != 10) return 'Enter a valid 10-digit mobile number';
                 return null;
               },
               style: const TextStyle(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
                 color: primaryDark,
-                letterSpacing: 0.5,
+                letterSpacing: 1,
               ),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.phone_android_rounded, color: primaryPurple),
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.only(left: 14, right: 8, top: 14),
+                  child: Text(
+                    '+91 ',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryPurple),
+                  ),
+                ),
+                suffixIcon: _autoDetected
+                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981))
+                    : null,
+                counterText: '',
+                hintText: 'Enter 10-digit mobile number',
+                hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -786,18 +1099,14 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
             ),
             const SizedBox(height: 18),
 
-            // 2. Operator Selector (Database Loaded)
+            // 2. Operator Selector
             const Text(
               'Operator',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: primaryDark,
-              ),
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: primaryDark),
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _loadingOperators ? null : _showOperatorPicker,
+              onTap: _showOperatorPicker,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -812,9 +1121,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _loadingOperators
-                            ? 'Loading operators from database...'
-                            : (_selectedOperator ?? 'Select operator'),
+                        _selectedOperator ?? 'Select operator',
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -822,32 +1129,21 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                         ),
                       ),
                     ),
-                    if (_loadingOperators)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
-                      )
-                    else
-                      const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 18),
 
-            // 3. Circle Selector (Database Loaded)
+            // 3. Circle Selector
             const Text(
               'Circle / Region',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: primaryDark,
-              ),
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: primaryDark),
             ),
             const SizedBox(height: 8),
             InkWell(
-              onTap: _loadingCircles ? null : _showCirclePicker,
+              onTap: _showCirclePicker,
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
@@ -862,9 +1158,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _loadingCircles
-                            ? 'Loading circles from database...'
-                            : (_selectedCircle ?? 'Select circle'),
+                        _selectedCircle ?? 'Select circle',
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -872,54 +1166,93 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                         ),
                       ),
                     ),
-                    if (_loadingCircles)
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: primaryPurple),
-                      )
-                    else
-                      const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
+                    const Icon(Icons.keyboard_arrow_down_rounded, color: textSubdued),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 18),
 
-            // 4. Amount & Browse Plans
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Recharge Amount',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: primaryDark,
-                  ),
-                ),
-                InkWell(
-                  onTap: _showBrowsePlans,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.list_alt_rounded, size: 14, color: primaryPurple),
-                        SizedBox(width: 4),
-                        Text(
-                          'Browse Plans',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: primaryPurple,
-                          ),
+            // TWO BIG ACTION BUTTONS (Hidden until Mobile + Operator ready)
+            if (_canShowActionButtons) ...[
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  // Button 1: Special R-Offer
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFEC4899), Color(0xFFF43F5E)],
                         ),
-                      ],
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFEC4899).withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: _loadingROffers ? null : _showROffersSheet,
+                        icon: const Icon(Icons.card_giftcard_rounded, size: 18, color: Colors.white),
+                        label: const Text(
+                          'R-Offers',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+
+                  // Button 2: Browse Plans
+                  Expanded(
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [primaryPurple, Color(0xFF9333EA)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryPurple.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed: _loadingPlans ? null : _showBrowsePlansSheet,
+                        icon: const Icon(Icons.bolt_rounded, size: 20, color: Colors.white),
+                        label: const Text(
+                          'Browse Plans',
+                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const SizedBox(height: 22),
+
+            // 4. Amount Input
+            const Text(
+              'Recharge Amount',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: primaryDark),
             ),
             const SizedBox(height: 8),
             TextFormField(
@@ -931,8 +1264,8 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                 return null;
               },
               style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
                 color: primaryDark,
               ),
               decoration: InputDecoration(
@@ -940,11 +1273,11 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   padding: EdgeInsets.only(left: 16, right: 8, top: 12),
                   child: Text(
                     '₹',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: primaryPurple),
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: primaryPurple),
                   ),
                 ),
                 hintText: 'Enter plan amount',
-                hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontWeight: FontWeight.normal),
                 filled: true,
                 fillColor: const Color(0xFFF8FAFC),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -960,6 +1293,30 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
                   borderRadius: BorderRadius.circular(16),
                   borderSide: const BorderSide(color: primaryPurple, width: 1.8),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Quick Preset Amount Chips
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [19, 199, 299, 349, 649, 999, 2999].map((amt) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ActionChip(
+                      label: Text(
+                        '₹$amt',
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: primaryPurple),
+                      ),
+                      backgroundColor: const Color(0xFFEDE9FE),
+                      side: BorderSide.none,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      onPressed: () => setState(() => _amountCtrl.text = amt.toString()),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
             const SizedBox(height: 28),
@@ -1060,7 +1417,7 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
               children: [
                 _receiptRow('Transaction ID', _merchantTxnId ?? '-'),
                 const Divider(height: 16, color: Color(0xFFE2E8F0)),
-                _receiptRow('Mobile Number', _mobileCtrl.text.replaceAll('+91 ', '').trim()),
+                _receiptRow('Mobile Number', _cleanMobile),
                 const Divider(height: 16, color: Color(0xFFE2E8F0)),
                 _receiptRow('Operator', _selectedOperator ?? '-'),
                 const Divider(height: 16, color: Color(0xFFE2E8F0)),

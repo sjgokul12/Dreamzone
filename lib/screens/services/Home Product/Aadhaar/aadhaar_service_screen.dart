@@ -146,7 +146,7 @@ class _AadhaarServiceScreenState extends State<AadhaarServiceScreen>
     } catch (_) {}
   }
 
-  double get _payableAmount => _selectedSectionId == 401 ? 50.00 : 60.00;
+  double get _payableAmount => _selectedSectionId == 401 ? 1.00 : 60.00;
 
   String get _currentAadhaarTypeName => _selectedSectionId == 401 ? 'Aadhaar Card - Soft Copy' : 'Aadhaar Card - Hard Copy';
 

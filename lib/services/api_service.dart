@@ -5,15 +5,35 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static const String baseUrl = 'https://dzi-backend.onrender.com/api';
+  static const String localBaseUrl = 'http://127.0.0.1:5000/api';
   static const String adminBaseUrl = 'https://dzi-backend.onrender.com/api/admin';
 
-  /// Centralized GET request that scans local IPs (192.168.1.6, 127.0.0.1, 10.0.2.2), localhost, and production Render URL.
-  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 8}) async {
+  static const List<String> _baseUrls = [
+    'http://127.0.0.1:5000/api',
+    'http://localhost:5000/api',
+    'https://dzi-backend.onrender.com/api',
+  ];
+
+  /// Centralized GET request that scans local backend first, falling back to Render.
+  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 25}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = <String, String>{};
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
+    }
+
+    for (final base in _baseUrls) {
+      try {
+        final res = await http
+            .get(Uri.parse('$base$path'), headers: headers)
+            .timeout(Duration(seconds: timeoutSeconds));
+        if (res.statusCode != 404 && res.statusCode != 502) {
+          return res;
+        }
+      } catch (_) {
+        // Try next base URL
+      }
     }
 
     try {
@@ -24,13 +44,26 @@ class ApiService {
     }
   }
 
-  /// Centralized POST request that scans local IPs and production Render URL.
-  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 8}) async {
+  /// Centralized POST request that scans local backend first, falling back to Render.
+  static Future<http.Response> postApi(String path, Map<String, dynamic> body, {int timeoutSeconds = 25}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = {'Content-Type': 'application/json'};
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
+    }
+
+    for (final base in _baseUrls) {
+      try {
+        final res = await http
+            .post(Uri.parse('$base$path'), headers: headers, body: jsonEncode(body))
+            .timeout(Duration(seconds: timeoutSeconds));
+        if (res.statusCode != 404 && res.statusCode != 502) {
+          return res;
+        }
+      } catch (_) {
+        // Try next base URL
+      }
     }
 
     try {

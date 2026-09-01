@@ -19,7 +19,7 @@ class PrivacyScreen extends StatelessWidget {
         _Section(title: '5. Your Rights', content: 'You can request access, correction, or deletion of your data by contacting us. We will respond within 7 working days.'),
         _Section(title: '6. Security', content: 'We use SSL encryption, secure servers, and regular security audits to protect your data.'),
         _Section(title: '7. Cookies', content: 'We use essential cookies for app functionality. No tracking cookies are used.'),
-        _Section(title: '8. Contact', content: 'Email: dreamzone.infinity@gmail.com\nPhone: +91 9986074786\nAddress: NO-79, 5TH CROSS, RAMESHNAGAR, Bengaluru, Karnataka 560037'),
+        _Section(title: '8. Contact', content: 'Email: dreamzone.infinity@gmail.com\nPhone: +91 9880885551\nAddress: NO-79, 5TH CROSS, RAMESHNAGAR, Bengaluru, Karnataka 560037'),
       ])),
     );
   }

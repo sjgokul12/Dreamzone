@@ -482,7 +482,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen>
                   label: 'Call Us',
                   color: const Color(0xFF10B981),
                   onTap: () async {
-                    final uri = Uri.parse('tel:18001234567');
+                    final uri = Uri.parse('tel:+919880885551');
                     if (await canLaunchUrl(uri)) await launchUrl(uri);
                   },
                 ),
@@ -494,7 +494,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen>
                   label: 'WhatsApp',
                   color: const Color(0xFF25D366),
                   onTap: () async {
-                    final uri = Uri.parse('https://wa.me/919876543210');
+                    final uri = Uri.parse('https://wa.me/919880885551?text=Hello%20DreamZone%20Support%2C%20I%20need%20assistance');
                     if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
                   },
                 ),
@@ -506,7 +506,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen>
                   label: 'Email',
                   color: const Color(0xFF3B82F6),
                   onTap: () async {
-                    final uri = Uri.parse('mailto:support@dziinfinity.com');
+                    final uri = Uri.parse('mailto:dreamzone.infinity@gmail.com');
                     if (await canLaunchUrl(uri)) await launchUrl(uri);
                   },
                 ),

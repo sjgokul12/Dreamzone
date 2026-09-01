@@ -6,8 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../home/home_screen.dart';
 
 /// Full-screen responsive video Splash Screen.
-/// Plays `assets/Welcome.mp4` with no text or buttons,
-/// and automatically transitions to the Home Screen upon completion.
+/// Plays `assets/Welcome.mp4` full-screen and navigates to HomeScreen upon completion.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,7 +15,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isVideoInitialized = false;
   bool _hasNavigated = false;
   Timer? _fallbackTimer;
@@ -29,43 +28,48 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   }
 
   void _initializeVideo() {
-    _controller = VideoPlayerController.asset('assets/Welcome.mp4');
-    _controller.initialize().then((_) {
-      if (!mounted) return;
-      setState(() {
-        _isVideoInitialized = true;
+    try {
+      _controller = VideoPlayerController.asset('assets/Welcome.mp4');
+      _controller!.initialize().then((_) {
+        if (!mounted) return;
+        setState(() {
+          _isVideoInitialized = true;
+        });
+
+        _controller!.setLooping(false);
+        _controller!.setVolume(0.0);
+        _controller!.play();
+
+        _controller!.addListener(_checkVideoProgress);
+
+        final duration = _controller!.value.duration;
+        final safetyDuration = duration > const Duration(seconds: 1)
+            ? duration + const Duration(milliseconds: 300)
+            : const Duration(milliseconds: 3500);
+
+        _fallbackTimer?.cancel();
+        _fallbackTimer = Timer(safetyDuration, _navigateToNextScreen);
+      }).catchError((error) {
+        debugPrint('[SplashScreen Video Error]: $error');
+        _fallbackTimer?.cancel();
+        _fallbackTimer = Timer(const Duration(milliseconds: 3000), _navigateToNextScreen);
       });
+    } catch (e) {
+      debugPrint('[SplashScreen Exception]: $e');
+      _fallbackTimer?.cancel();
+      _fallbackTimer = Timer(const Duration(milliseconds: 3000), _navigateToNextScreen);
+    }
 
-      _controller.setLooping(false);
-      _controller.setVolume(0.0);
-      _controller.play();
-
-      // Listen for video completion
-      _controller.addListener(_checkVideoProgress);
-
-      // Dynamic fallback timer based on video duration
-      final duration = _controller.value.duration;
-      final safetyDuration = duration > Duration.zero
-          ? duration + const Duration(milliseconds: 300)
-          : const Duration(seconds: 4);
-
-      _fallbackTimer = Timer(safetyDuration, _navigateToNextScreen);
-    }).catchError((error) {
-      debugPrint('[SplashScreen Video Error]: $error');
-      // If video fails to load, navigate after short splash delay
-      _fallbackTimer = Timer(const Duration(seconds: 2), _navigateToNextScreen);
-    });
-
-    // Hard fallback in case initialize hangs
-    _fallbackTimer = Timer(const Duration(seconds: 6), _navigateToNextScreen);
+    // Default safety timer so splash screen never gets stuck
+    _fallbackTimer = Timer(const Duration(milliseconds: 4000), _navigateToNextScreen);
   }
 
   void _checkVideoProgress() {
-    if (!mounted || _hasNavigated) return;
-    if (_controller.value.isInitialized) {
-      final pos = _controller.value.position;
-      final dur = _controller.value.duration;
-      if (dur > Duration.zero && pos >= dur - const Duration(milliseconds: 150)) {
+    if (!mounted || _hasNavigated || _controller == null) return;
+    if (_controller!.value.isInitialized) {
+      final pos = _controller!.value.position;
+      final dur = _controller!.value.duration;
+      if (dur > const Duration(seconds: 1) && pos >= dur - const Duration(milliseconds: 200)) {
         _navigateToNextScreen();
       }
     }
@@ -86,18 +90,18 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
         transitionsBuilder: (_, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
-        transitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: const Duration(milliseconds: 350),
       ),
     );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!_isVideoInitialized) return;
+    if (!_isVideoInitialized || _controller == null) return;
     if (state == AppLifecycleState.resumed) {
-      _controller.play();
+      _controller!.play();
     } else if (state == AppLifecycleState.paused) {
-      _controller.pause();
+      _controller!.pause();
     }
   }
 
@@ -105,8 +109,10 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _fallbackTimer?.cancel();
-    _controller.removeListener(_checkVideoProgress);
-    _controller.dispose();
+    if (_controller != null) {
+      _controller!.removeListener(_checkVideoProgress);
+      _controller!.dispose();
+    }
     super.dispose();
   }
 
@@ -116,23 +122,31 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SizedBox(
-        width: size.width,
-        height: size.height,
-        child: _isVideoInitialized
-            ? FittedBox(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Clean solid black backdrop
+          const ColoredBox(color: Colors.black),
+
+          // Welcome Video Player Layer (Plays full-screen)
+          if (_isVideoInitialized && _controller != null && _controller!.value.isInitialized)
+            SizedBox(
+              width: size.width,
+              height: size.height,
+              child: FittedBox(
                 fit: BoxFit.cover,
                 child: SizedBox(
-                  width: _controller.value.size.width > 0
-                      ? _controller.value.size.width
+                  width: _controller!.value.size.width > 0
+                      ? _controller!.value.size.width
                       : size.width,
-                  height: _controller.value.size.height > 0
-                      ? _controller.value.size.height
+                  height: _controller!.value.size.height > 0
+                      ? _controller!.value.size.height
                       : size.height,
-                  child: VideoPlayer(_controller),
+                  child: VideoPlayer(_controller!),
                 ),
-              )
-            : const SizedBox.shrink(),
+              ),
+            ),
+        ],
       ),
     );
   }

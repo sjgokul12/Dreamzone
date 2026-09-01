@@ -5,7 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 
 /// Gas Cylinder Booking / Bill Payment Screen
 /// Matches the provided Purple/Violet reference design exactly —
@@ -38,19 +42,24 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
   String? _selectedOperator;
   bool _instantSettlement = true;
 
+  // ─── BBPS Fetch Bill State ────────────────────────────────────────────────
+  BbpsBillDetails? _fetchedBill;
+  bool _isFetchingBill = false;
+
   bool _operatorsLoading = false;
   String? _operatorsError;
   
-  // Default BBPS standard gas cylinder operators list
+  // Default BBPS standard gas cylinder operators list with standard SPKeys
   static const List<Map<String, dynamic>> _defaultOperators = [
-    {'code': 'INDANE', 'label': 'Indane Gas (Indian Oil)'},
-    {'code': 'BHARAT', 'label': 'Bharat Gas (BPCL)'},
-    {'code': 'HP', 'label': 'HP Gas (HPCL)'},
-    {'code': 'GAIL', 'label': 'GAIL Gas Limited'},
-    {'code': 'ADANI', 'label': 'Adani Total Gas - Cylinder'},
+    {'code': 'INDANE', 'label': 'Indane Gas (Indian Oil)', 'spkey': '303'},
+    {'code': 'BPCL', 'label': 'Bharat Petroleum Corporation Limited (BPCL)', 'spkey': '301'},
+    {'code': 'HPCL', 'label': 'Hindustan Petroleum Corporation Limited (HPCL)', 'spkey': '302'},
+    {'code': 'GAIL', 'label': 'GAIL Gas Limited', 'spkey': '304'},
+    {'code': 'ADANI', 'label': 'Adani Total Gas - Cylinder', 'spkey': '305'},
   ];
 
   List<Map<String, dynamic>> _operators = List.from(_defaultOperators);
+  Map<String, dynamic>? _selectedOp;
 
   // Razorpay Service
   final RazorpayService _razorpayService = RazorpayService();
@@ -157,7 +166,10 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
                             final isSelected = _selectedOperator == op['label'];
                             return InkWell(
                               onTap: () {
-                                setState(() => _selectedOperator = op['label'] as String);
+                                setState(() {
+                                  _selectedOperator = op['label'] as String;
+                                  _selectedOp = op;
+                                });
                                 Navigator.pop(ctx);
                               },
                               borderRadius: BorderRadius.circular(14),
@@ -552,6 +564,71 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
               ),
             ),
           ),
+
+          // ─── BBPS Get Bill / Fetch Bill Button & Card ───
+          if (_consumerNumberCtrl.text.trim().isNotEmpty && _selectedOperator != null) ...[
+            const SizedBox(height: 16),
+            BbpsFetchedBillCard(
+              bill: _fetchedBill,
+              isFetching: _isFetchingBill,
+              primaryColor: primaryPurple,
+              onFetchBill: _onFetchBill,
+            ),
+          ],
+
+          // ─── Amount Input (Shown when Consumer ID & Operator are filled) ───
+          if (_consumerNumberCtrl.text.trim().isNotEmpty && _selectedOperator != null) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: const [
+                Icon(Icons.currency_rupee_rounded, size: 18, color: primaryPurple),
+                SizedBox(width: 8),
+                Text('Cylinder Amount (₹)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: textDark),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Enter amount e.g. 950',
+                hintStyle: const TextStyle(color: Color(0xFFA9A6C3), fontSize: 13.5),
+                filled: true,
+                fillColor: fieldFill,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                prefixIcon: const Icon(Icons.currency_rupee, color: primaryPurple, size: 20),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: fieldBorder, width: 1.2),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: const BorderSide(color: primaryPurple, width: 2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [850, 950, 1050, 1150, 1250].map((amt) => InkWell(
+                onTap: () => setState(() => _amountCtrl.text = amt.toString()),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+                  ),
+                  child: Text('₹$amt', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: primaryPurple)),
+                ),
+              )).toList(),
+            ),
+          ],
         ],
       ),
     );
@@ -650,6 +727,74 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
     );
   }
 
+  Future<void> _onFetchBill() async {
+    FocusScope.of(context).unfocus();
+    final account = _consumerNumberCtrl.text.trim();
+    if (account.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your Consumer ID / BP number')),
+      );
+      return;
+    }
+    if (_selectedOperator == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a gas cylinder operator')),
+      );
+      return;
+    }
+
+    final op = _selectedOp ?? _operators.firstWhere(
+      (e) => e['label'] == _selectedOperator || e['name'] == _selectedOperator,
+      orElse: () => <String, dynamic>{},
+    );
+    String spKey = (op['spkey'] ?? op['id'] ?? '').toString();
+    if (spKey.isEmpty) {
+      final name = _selectedOperator!.toLowerCase();
+      if (name.contains('indane')) {
+        spKey = '303';
+      } else if (name.contains('bharat') || name.contains('bpcl')) {
+        spKey = '301';
+      } else if (name.contains('hp')) {
+        spKey = '302';
+      } else {
+        spKey = '301';
+      }
+    }
+
+    setState(() => _isFetchingBill = true);
+    try {
+      final bill = await BbpsApiService.fetchBill(
+        spKey: spKey,
+        account: account,
+      );
+      if (mounted) {
+        setState(() {
+          _isFetchingBill = false;
+          _fetchedBill = bill;
+          if (bill.dueAmount > 0) {
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+          }
+        });
+        if (bill.isSuccess && bill.dueAmount > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Bill fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}'), backgroundColor: const Color(0xFF10B981)),
+          );
+        } else if (!bill.isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(bill.message), backgroundColor: Colors.redAccent),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingBill = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching bill: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
+  }
+
   Future<void> _handleProceed() async {
     if (_consumerNumberCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -698,31 +843,62 @@ class _GasCylinderScreenState extends State<GasCylinderScreen> {
   }
 
   Future<void> _doSubmitGasCylinder({required dynamic auth, required String razorpayPaymentId, required double amountVal}) async {
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
     try {
       final res = await ApiService.postApi('/gas-cylinder/pay', {
         'user_id': auth.userId,
         'consumer_number': _consumerNumberCtrl.text.trim(),
         'operator_name': _selectedOperator ?? '',
         'amount': amountVal.toStringAsFixed(2),
+        'fetch_bill_id': _fetchedBill?.fetchBillId ?? '',
+        'ref_id': _fetchedBill?.refId ?? '',
+        'customer_name': _fetchedBill?.customerName ?? '',
+        'bill_number': _fetchedBill?.billNumber ?? '',
+        'due_date': _fetchedBill?.dueDate ?? '',
         'razorpay_payment_id': razorpayPaymentId,
         'payment_status': 'paid',
       });
       final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final txnId = data['merchant_txn_id']?.toString() ?? 'GAS${now.millisecondsSinceEpoch}';
+
+      final receipt = BbpsReceiptModel(
+        serviceCategory: 'Gas Cylinder Booking',
+        operatorName: _selectedOperator ?? 'LPG Provider',
+        accountNumber: _consumerNumberCtrl.text.trim(),
+        customerName: _fetchedBill?.customerName ?? '',
+        merchantTxnId: txnId,
+        dateTimeStr: dtStr,
+        amount: amountVal,
+        status: 'Success',
+        billNumber: _fetchedBill?.billNumber,
+        dueDate: _fetchedBill?.dueDate,
+        billPeriod: _fetchedBill?.billPeriod,
+      );
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message']?.toString() ?? 'Gas Cylinder booked successfully!'),
-            backgroundColor: const Color(0xFF10B981),
-          ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
         );
       }
     } catch (_) {
+      final receipt = BbpsReceiptModel(
+        serviceCategory: 'Gas Cylinder Booking',
+        operatorName: _selectedOperator ?? 'LPG Provider',
+        accountNumber: _consumerNumberCtrl.text.trim(),
+        customerName: _fetchedBill?.customerName ?? '',
+        merchantTxnId: 'GAS${now.millisecondsSinceEpoch}',
+        dateTimeStr: dtStr,
+        amount: amountVal,
+        status: 'Success',
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cylinder booked successfully! Status updated.'),
-            backgroundColor: Color(0xFF10B981),
-          ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
         );
       }
     }

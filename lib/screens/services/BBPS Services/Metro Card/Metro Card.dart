@@ -6,6 +6,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
 import '../../../../core/payment/razorpay_service.dart';
 import '../../../../services/metro_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../bbps_receipt_screen.dart';
 
 typedef MetroCard = MetroCardScreen;
 typedef Metro     = MetroCardScreen;
@@ -685,7 +687,24 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
     final isPen = _resultStatus == 'pending';
     final col   = isOk ? const Color(0xFF10B981) : isPen ? const Color(0xFFF59E0B) : const Color(0xFFEF4444);
     final icon  = isOk ? Icons.check_circle_rounded : isPen ? Icons.hourglass_top_rounded : Icons.cancel_rounded;
-    final title = isOk ? 'Recharged!' : isPen ? 'Processing…' : 'Recharge Failed';
+    final title = isOk ? 'Metro Card Recharged!' : isPen ? 'Processing…' : 'Recharge Failed';
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? 0.0;
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'Metro Card Recharge',
+      operatorName: _selectedOp?['name']?.toString() ?? 'Metro Rail Authority',
+      accountNumber: _cardNoCtrl.text.trim(),
+      customerName: '',
+      merchantTxnId: _merchantTxnId ?? 'MET${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isOk ? 'Success' : (isPen ? 'Pending' : 'Failed'),
+    );
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -744,22 +763,78 @@ class _MetroCardScreenState extends State<MetroCardScreen> with SingleTickerProv
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // ── Download / View Bill Receipt & Share Buttons ──
+              if (isOk) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                      );
+                    },
+                    icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                    label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryPurple,
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                        icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                        label: const Text('WhatsApp', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF25D366),
+                          side: const BorderSide(color: Color(0xFF25D366)),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                        icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                        label: const Text('Email', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primaryPurple,
+                          side: const BorderSide(color: primaryPurple),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+
               SizedBox(
                 width: double.infinity,
                 height: 46,
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () => setState(() {
                     _resultStatus = null; _resultMessage = null; _merchantTxnId = null;
                     _cardNoCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
                   }),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryPurple,
-                    foregroundColor: Colors.white,
-                    elevation: 2,
+                  style: TextButton.styleFrom(
+                    foregroundColor: textSubdued,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Recharge Another Card', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  child: const Text('Recharge Another Card', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],

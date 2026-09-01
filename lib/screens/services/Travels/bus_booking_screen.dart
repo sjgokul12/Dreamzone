@@ -137,10 +137,7 @@ class BusBookingScreen extends StatefulWidget {
 }
 
 class _BusBookingScreenState extends State<BusBookingScreen> {
-  static const Color primaryNavy = Color.fromARGB(255, 50, 199, 202);
   static const Color accentOrange = Color(0xFFFF5500);
-  static const Color bgGrey = Color(0xFFF8FAFC);
-  static const Color cardWhite = Color(0xFFFFFFFF);
   static const Color textDark = Color.fromARGB(255, 71, 93, 180);
 
   final TextEditingController _sourceController = TextEditingController();
@@ -148,13 +145,18 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
   DateTime _journeyDate = DateTime.now().add(const Duration(days: 1));
 
   List<String> _stationList = [];
-  bool _isLoadingStations = true;
-  String? _stationError;
 
   @override
   void initState() {
     super.initState();
     _fetchStations();
+  }
+
+  @override
+  void dispose() {
+    _sourceController.dispose();
+    _destController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchStations() async {
@@ -166,30 +168,16 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
             _stationList = (data['stationList'] as List)
                 .map((s) => s['stationName'].toString())
                 .toList();
-            _isLoadingStations = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _stationError = data['apiStatus']?['message']?.toString() ?? 'Failed to load stations from server';
-            _isLoadingStations = false;
           });
         }
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _stationError = 'Failed to load stations: $e';
-          _isLoadingStations = false;
-        });
-      }
-    }
+    } catch (_) {}
   }
 
-
-
   Future<void> _selectDate(BuildContext context) async {
+    FocusScope.of(context).unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _journeyDate,
@@ -208,6 +196,10 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
         );
       },
     );
+
+    if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+
     if (picked != null && picked != _journeyDate) {
       setState(() {
         _journeyDate = picked;
@@ -220,118 +212,121 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     final isDesktop = width > 900;
-    final isTablet = width > 600 && width <= 900;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        elevation: 0,
-        centerTitle: true,
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Color(0xFF8B5CF6),
-              size: 20,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFFF8FAFC),
+          elevation: 0,
+          centerTitle: true,
+          leading: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
             ),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        title: const Text(
-          'Bus Ticket Booking',
-          style: TextStyle(
-            color: Color(0xFF1E293B),
-            fontWeight: FontWeight.w800,
-            fontSize: 22,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Image Banner
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.asset(
-                  'assets/Bus.png',
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back,
+                color: Color(0xFF8B5CF6),
+                size: 20,
               ),
-              const SizedBox(height: 16),
-
-              // Search Form Container
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          title: const Text(
+            'Bus Ticket Booking',
+            style: TextStyle(
+              color: Color(0xFF1E293B),
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+            ),
+          ),
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image Banner
+                ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+                  child: Image.asset(
+                    'assets/Bus.png',
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                child: isDesktop
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(child: _buildSourceField()),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildDestField()),
-                          const SizedBox(width: 16),
-                          Expanded(child: _buildDateField(context)),
-                          const SizedBox(width: 16),
-                          _buildSearchButton(),
-                        ],
-                      )
-                    : Column(
-                        children: [
-                          _buildSourceField(),
-                          const SizedBox(height: 16),
-                          _buildDestField(),
-                          const SizedBox(height: 16),
-                          _buildDateField(context),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: _buildSearchButton(),
-                          ),
-                        ],
-                      ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Features Row
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                // Search Form Container
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: isDesktop
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(child: _buildSourceField()),
+                            const SizedBox(width: 16),
+                            Expanded(child: _buildDestField()),
+                            const SizedBox(width: 16),
+                            Expanded(child: _buildDateField(context)),
+                            const SizedBox(width: 16),
+                            _buildSearchButton(),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            _buildSourceField(),
+                            const SizedBox(height: 16),
+                            _buildDestField(),
+                            const SizedBox(height: 16),
+                            _buildDateField(context),
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: _buildSearchButton(),
+                            ),
+                          ],
+                        ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(child: _buildFeatureItem(Icons.verified_user_rounded, 'Safe & Secure', 'Your safety is\nour priority', const Color(0xFF3B82F6))),
-                    Container(height: 40, width: 1, color: Colors.grey.withValues(alpha: 0.2)),
-                    Expanded(child: _buildFeatureItem(Icons.local_activity_rounded, 'Best Prices', 'Get the best deals\non every booking', const Color(0xFF8B5CF6))),
-                    Container(height: 40, width: 1, color: Colors.grey.withValues(alpha: 0.2)),
-                    Expanded(child: _buildFeatureItem(Icons.headset_mic_rounded, '24/7 Support', "We're here for you\nanytime, anywhere", const Color(0xFF8B5CF6))),
-                  ],
+                const SizedBox(height: 16),
+
+                // Features Row
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildFeatureItem(Icons.verified_user_rounded, 'Safe & Secure', 'Your safety is\nour priority', const Color(0xFF3B82F6))),
+                      Container(height: 40, width: 1, color: Colors.grey.withValues(alpha: 0.2)),
+                      Expanded(child: _buildFeatureItem(Icons.local_activity_rounded, 'Best Prices', 'Get the best deals\non every booking', const Color(0xFF8B5CF6))),
+                      Container(height: 40, width: 1, color: Colors.grey.withValues(alpha: 0.2)),
+                      Expanded(child: _buildFeatureItem(Icons.headset_mic_rounded, '24/7 Support', "We're here for you\nanytime, anywhere", const Color(0xFF8B5CF6))),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -397,17 +392,20 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
     return _buildInputFieldTemplate(
       label: 'Source City',
       child: Autocomplete<String>(
-        initialValue: TextEditingValue(text: _sourceController.text),
         optionsBuilder: (TextEditingValue textEditingValue) {
-          if (textEditingValue.text.isEmpty) {
+          final q = textEditingValue.text.trim();
+          if (q.isEmpty) {
             return const Iterable<String>.empty();
           }
           return _stationList.where((String option) {
-            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+            return option.toLowerCase().contains(q.toLowerCase());
           });
         },
         onSelected: (String selection) {
           _sourceController.text = selection;
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() {});
         },
         optionsViewBuilder: (context, onSelected, options) {
           return Align(
@@ -442,12 +440,17 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
           );
         },
         fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-          controller.addListener(() {
-            _sourceController.text = controller.text;
-          });
           return TextField(
             controller: controller,
             focusNode: focusNode,
+            onChanged: (value) {
+              _sourceController.text = value;
+            },
+            onSubmitted: (value) {
+              _sourceController.text = value;
+              onFieldSubmitted();
+              FocusScope.of(context).unfocus();
+            },
             style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               hintText: 'Search Source City',
@@ -476,17 +479,20 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
     return _buildInputFieldTemplate(
       label: 'Destination City',
       child: Autocomplete<String>(
-        initialValue: TextEditingValue(text: _destController.text),
         optionsBuilder: (TextEditingValue textEditingValue) {
-          if (textEditingValue.text.isEmpty) {
+          final q = textEditingValue.text.trim();
+          if (q.isEmpty) {
             return const Iterable<String>.empty();
           }
           return _stationList.where((String option) {
-            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+            return option.toLowerCase().contains(q.toLowerCase());
           });
         },
         onSelected: (String selection) {
           _destController.text = selection;
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() {});
         },
         optionsViewBuilder: (context, onSelected, options) {
           return Align(
@@ -521,12 +527,17 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
           );
         },
         fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-          controller.addListener(() {
-            _destController.text = controller.text;
-          });
           return TextField(
             controller: controller,
             focusNode: focusNode,
+            onChanged: (value) {
+              _destController.text = value;
+            },
+            onSubmitted: (value) {
+              _destController.text = value;
+              onFieldSubmitted();
+              FocusScope.of(context).unfocus();
+            },
             style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B), fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               hintText: 'Search Destination City',
@@ -622,13 +633,46 @@ class _BusBookingScreenState extends State<BusBookingScreen> {
           ),
         ),
         onPressed: () {
-          final dateStr = '${_journeyDate.year}-${_journeyDate.month.toString().padLeft(2, '0')}-${_journeyDate.day.toString().padLeft(2, '0')}';
+          FocusScope.of(context).unfocus();
+          final source = _sourceController.text.trim();
+          final dest = _destController.text.trim();
+
+          if (source.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please select or enter a source city'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return;
+          }
+          if (dest.isEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please select or enter a destination city'),
+                backgroundColor: Colors.redAccent,
+              ),
+            );
+            return;
+          }
+          if (source.toLowerCase() == dest.toLowerCase()) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Source and Destination cities cannot be the same'),
+                backgroundColor: Colors.orangeAccent,
+              ),
+            );
+            return;
+          }
+
+          final dateStr =
+              '${_journeyDate.year}-${_journeyDate.month.toString().padLeft(2, '0')}-${_journeyDate.day.toString().padLeft(2, '0')}';
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => BusListScreen(
-                sourceCity: _sourceController.text,
-                destinationCity: _destController.text,
+                sourceCity: source,
+                destinationCity: dest,
                 doj: dateStr,
               ),
             ),

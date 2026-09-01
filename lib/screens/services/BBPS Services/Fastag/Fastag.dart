@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 
 typedef Fastag = FastagScreen;
 typedef FASTag = FastagScreen;
@@ -45,15 +48,18 @@ class _FastagScreenState extends State<FastagScreen>
   String? _opsError;
   Map<String, dynamic>? _selectedOp;
 
+  // ─── BBPS Fetch Bill State ────────────────────────────────────────────────
+  BbpsBillDetails? _fetchedBill;
+  bool _isFetchingBill = false;
+
   bool _submitting = false;
   String? _resultStatus;
   String? _resultMessage;
   String? _merchantTxnId;
 
-  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  // ─── Razorpay Service ───
   final RazorpayService _razorpayService = RazorpayService();
 
-  String get _base => ApiService.baseUrl;
   bool get _canShowAmount =>
       _vehicleNoCtrl.text.trim().isNotEmpty && _selectedOp != null;
 
@@ -90,7 +96,6 @@ class _FastagScreenState extends State<FastagScreen>
   @override
   void dispose() {
     _fadeController.dispose();
-    _fadeController.dispose();
     _vehicleNoCtrl.dispose();
     _amountCtrl.dispose();
     _searchCtrl.dispose();
@@ -125,6 +130,46 @@ class _FastagScreenState extends State<FastagScreen>
           _opsLoading = false;
           _opsError = 'Failed to load operators. Please check your connection and retry.';
         });
+      }
+    }
+  }
+
+  Future<void> _onFetchBill() async {
+    FocusScope.of(context).unfocus();
+    final account = _vehicleNoCtrl.text.trim().toUpperCase();
+    if (account.isEmpty) {
+      _snack('Please enter Vehicle Number / FASTag ID', isError: true);
+      return;
+    }
+    if (_selectedOp == null) {
+      _snack('Please select a FASTag bank operator', isError: true);
+      return;
+    }
+
+    setState(() => _isFetchingBill = true);
+    try {
+      final bill = await BbpsApiService.fetchBill(
+        spKey: _selectedOp!['spkey']?.toString() ?? '',
+        account: account,
+      );
+      if (mounted) {
+        setState(() {
+          _isFetchingBill = false;
+          _fetchedBill = bill;
+          if (bill.dueAmount > 0) {
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+          }
+        });
+        if (bill.isSuccess && bill.dueAmount > 0) {
+          _snack('FASTag details fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}');
+        } else if (!bill.isSuccess) {
+          _snack(bill.message, isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingBill = false);
+        _snack('Error fetching FASTag bill: $e', isError: true);
       }
     }
   }
@@ -165,21 +210,20 @@ class _FastagScreenState extends State<FastagScreen>
       _resultStatus = null;
     });
     try {
-      final res = await http
-          .post(
-            Uri.parse('$_base/fastag/pay'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'user_id': auth.userId,
-              'vehicle_no': _vehicleNoCtrl.text.trim().toUpperCase(),
-              'operator_id': _selectedOp!['spkey']?.toString() ?? '',
-              'operator_name': _selectedOp!['label']?.toString() ?? '',
-              'amount': _amountCtrl.text.trim(),
-              'razorpay_payment_id': razorpayPaymentId,
-              'payment_status': 'paid',
-            }),
-          )
-          .timeout(const Duration(seconds: 60));
+      final res = await ApiService.postApi('/fastag/pay', {
+        'user_id': auth.userId,
+        'vehicle_no': _vehicleNoCtrl.text.trim().toUpperCase(),
+        'operator_id': _selectedOp!['spkey']?.toString() ?? '',
+        'operator_name': _selectedOp!['label']?.toString() ?? '',
+        'amount': _amountCtrl.text.trim(),
+        'fetch_bill_id': _fetchedBill?.fetchBillId ?? '',
+        'ref_id': _fetchedBill?.refId ?? '',
+        'customer_name': _fetchedBill?.customerName ?? '',
+        'bill_number': _fetchedBill?.billNumber ?? '',
+        'due_date': _fetchedBill?.dueDate ?? '',
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status': 'paid',
+      });
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
@@ -715,7 +759,7 @@ class _FastagScreenState extends State<FastagScreen>
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _pill(Icons.directions_car_rounded, 'Vehicle No.'),
+        _pill(Icons.tag_rounded, 'Consumer ID'),
         _pill(Icons.account_balance_rounded, 'Bank Issuers'),
         _pill(Icons.bolt_rounded, 'Instant'),
         _pill(Icons.security_rounded, 'Secured'),
@@ -770,13 +814,13 @@ class _FastagScreenState extends State<FastagScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Vehicle Registration No.
+          // Consumer ID
           const Row(
             children: [
-              Icon(Icons.directions_car_outlined, size: 18, color: primaryPink),
+              Icon(Icons.tag_rounded, size: 18, color: primaryPink),
               SizedBox(width: 8),
               Text(
-                'Vehicle Registration Number',
+                'Consumer ID',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -796,10 +840,10 @@ class _FastagScreenState extends State<FastagScreen>
             ),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              LengthLimitingTextInputFormatter(12),
+              LengthLimitingTextInputFormatter(20),
             ],
             decoration: InputDecoration(
-              hintText: 'e.g. MH01AB1234',
+              hintText: 'Enter Consumer ID e.g. KA05ML5476',
               hintStyle: const TextStyle(
                 color: Color(0xFF94A3B8),
                 fontSize: 14,
@@ -811,7 +855,7 @@ class _FastagScreenState extends State<FastagScreen>
                 vertical: 16,
               ),
               prefixIcon: const Icon(
-                Icons.directions_car_rounded,
+                Icons.tag_rounded,
                 color: primaryPink,
                 size: 20,
               ),
@@ -848,9 +892,9 @@ class _FastagScreenState extends State<FastagScreen>
             onChanged: (_) => setState(() {}),
             validator: (v) {
               if (v == null || v.trim().isEmpty) {
-                return 'Enter vehicle registration number';
+                return 'Enter Consumer ID';
               }
-              if (v.trim().length < 5) return 'Enter a valid vehicle number';
+              if (v.trim().length < 4) return 'Enter a valid Consumer ID';
               return null;
             },
           ),
@@ -973,6 +1017,17 @@ class _FastagScreenState extends State<FastagScreen>
                   ),
                 ],
               ),
+            ),
+          ],
+
+          // ─── BBPS Get Bill / Fetch Bill Button & Card ───
+          if (_vehicleNoCtrl.text.trim().isNotEmpty && _selectedOp != null) ...[
+            const SizedBox(height: 16),
+            BbpsFetchedBillCard(
+              bill: _fetchedBill,
+              isFetching: _isFetchingBill,
+              primaryColor: primaryPink,
+              onFetchBill: _onFetchBill,
             ),
           ],
 
@@ -1178,6 +1233,26 @@ class _FastagScreenState extends State<FastagScreen>
         : isPen
         ? 'Processing…'
         : 'Recharge Failed';
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? (_fetchedBill?.dueAmount ?? 0.0);
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'FASTag Recharge',
+      operatorName: _selectedOp?['label']?.toString() ?? 'FASTag Issuer Bank',
+      accountNumber: _vehicleNoCtrl.text.trim(),
+      customerName: _fetchedBill?.customerName ?? '',
+      merchantTxnId: _merchantTxnId ?? 'FAS${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isOk ? 'Success' : (isPen ? 'Pending' : 'Failed'),
+      billNumber: _fetchedBill?.billNumber,
+      dueDate: _fetchedBill?.dueDate,
+      billPeriod: _fetchedBill?.billPeriod,
+    );
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Container(
@@ -1252,11 +1327,69 @@ class _FastagScreenState extends State<FastagScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
+
+            // ── Download / View Bill Receipt & Share Buttons ──
+            if (isOk) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                  label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryPink,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                      icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                      label: const Text('WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                      icon: const Icon(Icons.email_outlined, color: primaryPink, size: 18),
+                      label: const Text('Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryPink,
+                        side: const BorderSide(color: primaryPink),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
             SizedBox(
               width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
+              height: 48,
+              child: TextButton(
                 onPressed: () => setState(() {
                   _resultStatus = null;
                   _resultMessage = null;
@@ -1265,17 +1398,13 @@ class _FastagScreenState extends State<FastagScreen>
                   _amountCtrl.clear();
                   _selectedOp = null;
                 }),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryPink,
-                  foregroundColor: Colors.white,
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                style: TextButton.styleFrom(
+                  foregroundColor: textMuted,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: const Text(
                   'Recharge Another Tag',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

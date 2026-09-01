@@ -6,7 +6,11 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 
 typedef Landline = LandlineScreen;
 
@@ -44,12 +48,16 @@ class _LandlineScreenState extends State<LandlineScreen>
   String? _opsError;
   Map<String, dynamic>? _selectedOp;
 
+  // ─── BBPS Fetch Bill State ────────────────────────────────────────────────
+  BbpsBillDetails? _fetchedBill;
+  bool _isFetchingBill = false;
+
   bool _submitting = false;
   String? _resultStatus;
   String? _resultMessage;
   String? _merchantTxnId;
 
-  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  // ─── Razorpay Service ───
   final RazorpayService _razorpayService = RazorpayService();
 
   bool get _canShowAmount =>
@@ -133,6 +141,46 @@ class _LandlineScreenState extends State<LandlineScreen>
     }
   }
 
+  Future<void> _onFetchBill() async {
+    FocusScope.of(context).unfocus();
+    final account = '${_stdCodeCtrl.text.trim()}${_landlineCtrl.text.trim()}';
+    if (account.isEmpty) {
+      _snack('Please enter your landline number', isError: true);
+      return;
+    }
+    if (_selectedOp == null) {
+      _snack('Please select an operator', isError: true);
+      return;
+    }
+
+    setState(() => _isFetchingBill = true);
+    try {
+      final bill = await BbpsApiService.fetchBill(
+        spKey: _selectedOp!['spkey']?.toString() ?? '',
+        account: account,
+      );
+      if (mounted) {
+        setState(() {
+          _isFetchingBill = false;
+          _fetchedBill = bill;
+          if (bill.dueAmount > 0) {
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+          }
+        });
+        if (bill.isSuccess && bill.dueAmount > 0) {
+          _snack('Bill fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}');
+        } else if (!bill.isSuccess) {
+          _snack(bill.message, isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingBill = false);
+        _snack('Error fetching bill: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _handleProceed() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -176,6 +224,11 @@ class _LandlineScreenState extends State<LandlineScreen>
         'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
         'operator_name':       _selectedOp!['label']?.toString() ?? '',
         'amount':              _amountCtrl.text.trim(),
+        'fetch_bill_id':       _fetchedBill?.fetchBillId ?? '',
+        'ref_id':              _fetchedBill?.refId ?? '',
+        'customer_name':       _fetchedBill?.customerName ?? '',
+        'bill_number':         _fetchedBill?.billNumber ?? '',
+        'due_date':            _fetchedBill?.dueDate ?? '',
         'razorpay_payment_id': razorpayPaymentId,
         'payment_status':      'paid',
       });
@@ -979,6 +1032,17 @@ class _LandlineScreenState extends State<LandlineScreen>
             ),
           ],
 
+          // ─── BBPS Get Bill / Fetch Bill Button & Card ───
+          if (_landlineCtrl.text.trim().isNotEmpty && _selectedOp != null) ...[
+            const SizedBox(height: 16),
+            BbpsFetchedBillCard(
+              bill: _fetchedBill,
+              isFetching: _isFetchingBill,
+              primaryColor: primaryPurple,
+              onFetchBill: _onFetchBill,
+            ),
+          ],
+
           if (_canShowAmount) ...[
             const SizedBox(height: 22),
             const Row(
@@ -1184,10 +1248,30 @@ class _LandlineScreenState extends State<LandlineScreen>
         ? Icons.hourglass_top_rounded
         : Icons.cancel_rounded;
     final title = isOk
-        ? 'Bill Paid!'
+        ? 'Landline Bill Paid!'
         : isPen
         ? 'Processing…'
         : 'Payment Failed';
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? (_fetchedBill?.dueAmount ?? 0.0);
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'Landline Bill',
+      operatorName: _selectedOp?['label']?.toString() ?? 'Landline Operator',
+      accountNumber: _landlineCtrl.text.trim(),
+      customerName: _fetchedBill?.customerName ?? '',
+      merchantTxnId: _merchantTxnId ?? 'LL${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isOk ? 'Success' : (isPen ? 'Pending' : 'Failed'),
+      billNumber: _fetchedBill?.billNumber,
+      dueDate: _fetchedBill?.dueDate,
+      billPeriod: _fetchedBill?.billPeriod,
+    );
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Container(
@@ -1262,11 +1346,69 @@ class _LandlineScreenState extends State<LandlineScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
+
+            // ── Download / View Bill Receipt & Share Buttons ──
+            if (isOk) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                  label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryPurple,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                      icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                      label: const Text('WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                      icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                      label: const Text('Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryPurple,
+                        side: const BorderSide(color: primaryPurple),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
             SizedBox(
               width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
+              height: 48,
+              child: TextButton(
                 onPressed: () => setState(() {
                   _resultStatus = null;
                   _resultMessage = null;
@@ -1276,17 +1418,13 @@ class _LandlineScreenState extends State<LandlineScreen>
                   _amountCtrl.clear();
                   _selectedOp = null;
                 }),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryPurple,
-                  foregroundColor: Colors.white,
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                style: TextButton.styleFrom(
+                  foregroundColor: textMuted,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 child: const Text(
                   'Pay Another Bill',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 
 typedef PipedGasBill = PipedGasBillScreen;
 
@@ -42,12 +45,16 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
   String?                     _opsError;
   Map<String, dynamic>?       _selectedOp;
 
+  // ─── BBPS Fetch Bill State ────────────────────────────────────────────────
+  BbpsBillDetails? _fetchedBill;
+  bool _isFetchingBill = false;
+
   bool    _submitting    = false;
   String? _resultStatus;
   String? _resultMessage;
   String? _merchantTxnId;
 
-  // \u2500\u2500\u2500 Razorpay Service \u2500\u2500\u2500
+  // ─── Razorpay Service ───
   final RazorpayService _razorpayService = RazorpayService();
 
   String get _base => ApiService.baseUrl;
@@ -107,6 +114,46 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
     }
   }
 
+  Future<void> _onFetchBill() async {
+    FocusScope.of(context).unfocus();
+    final account = _consumerIdCtrl.text.trim();
+    if (account.isEmpty) {
+      _snack('Please enter your consumer number', isError: true);
+      return;
+    }
+    if (_selectedOp == null) {
+      _snack('Please select a gas operator', isError: true);
+      return;
+    }
+
+    setState(() => _isFetchingBill = true);
+    try {
+      final bill = await BbpsApiService.fetchBill(
+        spKey: _selectedOp!['spkey']?.toString() ?? '',
+        account: account,
+      );
+      if (mounted) {
+        setState(() {
+          _isFetchingBill = false;
+          _fetchedBill = bill;
+          if (bill.dueAmount > 0) {
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+          }
+        });
+        if (bill.isSuccess && bill.dueAmount > 0) {
+          _snack('Bill fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}');
+        } else if (!bill.isSuccess) {
+          _snack(bill.message, isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingBill = false);
+        _snack('Error fetching bill: $e', isError: true);
+      }
+    }
+  }
+
   Future<void> _handleProceed() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
@@ -134,19 +181,20 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
   Future<void> _doSubmitPipedGas({required dynamic auth, required String razorpayPaymentId}) async {
     setState(() { _submitting = true; _resultStatus = null; });
     try {
-      final res = await http.post(
-        Uri.parse('$_base/piped-gas/pay'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'user_id':             auth.userId,
-          'consumer_no':         _consumerIdCtrl.text.trim(),
-          'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
-          'operator_name':       _selectedOp!['label']?.toString() ?? '',
-          'amount':              _amountCtrl.text.trim(),
-          'razorpay_payment_id': razorpayPaymentId,
-          'payment_status':      'paid',
-        }),
-      ).timeout(const Duration(seconds: 60));
+      final res = await ApiService.postApi('/piped-gas/pay', {
+        'user_id':             auth.userId,
+        'consumer_no':         _consumerIdCtrl.text.trim(),
+        'operator_id':         _selectedOp!['spkey']?.toString() ?? '',
+        'operator_name':       _selectedOp!['label']?.toString() ?? '',
+        'amount':              _amountCtrl.text.trim(),
+        'fetch_bill_id':       _fetchedBill?.fetchBillId ?? '',
+        'ref_id':              _fetchedBill?.refId ?? '',
+        'customer_name':       _fetchedBill?.customerName ?? '',
+        'bill_number':         _fetchedBill?.billNumber ?? '',
+        'due_date':            _fetchedBill?.dueDate ?? '',
+        'razorpay_payment_id': razorpayPaymentId,
+        'payment_status':      'paid',
+      });
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       if (mounted) {
         setState(() {
@@ -637,7 +685,6 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
             ),
           ),
 
-          // Error banner if backend connection failed
           if (_opsError != null) ...[
             const SizedBox(height: 12),
             Container(
@@ -671,6 +718,17 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
                   ),
                 ),
               ]),
+            ),
+          ],
+
+          // ─── BBPS Get Bill / Fetch Bill Button & Card ───
+          if (_consumerIdCtrl.text.trim().isNotEmpty && _selectedOp != null) ...[
+            const SizedBox(height: 16),
+            BbpsFetchedBillCard(
+              bill: _fetchedBill,
+              isFetching: _isFetchingBill,
+              primaryColor: primaryPurple,
+              onFetchBill: _onFetchBill,
             ),
           ],
 
@@ -846,6 +904,25 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
     final col   = isOk ? const Color(0xFF10B981) : isPen ? const Color(0xFFF59E0B) : const Color(0xFFE11D48);
     final icon  = isOk ? Icons.check_circle_rounded : isPen ? Icons.hourglass_top_rounded : Icons.cancel_rounded;
     final title = isOk ? 'Piped Gas Bill Paid!' : isPen ? 'Payment Processing…' : 'Payment Failed';
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? (_fetchedBill?.dueAmount ?? 0.0);
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'Piped Gas Bill',
+      operatorName: _selectedOp?['label']?.toString() ?? 'Piped Gas Authority',
+      accountNumber: _consumerIdCtrl.text.trim(),
+      customerName: _fetchedBill?.customerName ?? '',
+      merchantTxnId: _merchantTxnId ?? 'GAS${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isOk ? 'Success' : (isPen ? 'Pending' : 'Failed'),
+      billNumber: _fetchedBill?.billNumber,
+      dueDate: _fetchedBill?.dueDate,
+      billPeriod: _fetchedBill?.billPeriod,
+    );
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -888,21 +965,77 @@ class _PipedGasBillScreenState extends State<PipedGasBillScreen>
               ),
             ]),
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 20),
+
+          // ── Download / View Bill Receipt & Share Buttons ──
+          if (isOk) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryPurple,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                    icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                    label: const Text('WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF25D366),
+                      side: const BorderSide(color: Color(0xFF25D366)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                    icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                    label: const Text('Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryPurple,
+                      side: const BorderSide(color: primaryPurple),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
           SizedBox(
-            width: double.infinity, height: 50,
-            child: ElevatedButton(
+            width: double.infinity, height: 48,
+            child: TextButton(
               onPressed: () => setState(() {
                 _resultStatus = null; _resultMessage = null; _merchantTxnId = null;
                 _consumerIdCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
               }),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryPurple,
-                foregroundColor: Colors.white,
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              style: TextButton.styleFrom(
+                foregroundColor: textMuted,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Pay Another Bill', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              child: const Text('Pay Another Bill', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ),
           ),
         ]),

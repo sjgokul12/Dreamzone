@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../services/prepaid_api_service.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 import 'prepaid_recharge_screen.dart';
 
 class PostpaidRechargeScreen extends StatefulWidget {
@@ -28,6 +32,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   List<Map<String, dynamic>> _operators = [];
   String? _selectedOperator;
   bool _loadingOperators = true;
+  bool _isAutoDetecting = false;
 
   bool _fetchingBill = false;
   Map<String, dynamic>? _fetchedBillDetails;
@@ -55,9 +60,6 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
         setState(() {
           if (res['success'] == true && res['operators'] != null) {
             _operators = List<Map<String, dynamic>>.from(res['operators']);
-            if (_operators.isNotEmpty && _selectedOperator == null) {
-              _selectedOperator = _operators.first['label'];
-            }
           }
           _loadingOperators = false;
         });
@@ -76,25 +78,54 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   }
 
   void _onMobileChanged(String value) {
-    String clean = value.replaceAll('+91 ', '').replaceAll(' ', '').trim();
-    if (clean.length == 10 && _operators.isNotEmpty) {
-      final prefix = clean.substring(0, 2);
-      for (final op in _operators) {
-        final label = (op['label'] ?? '').toString().toLowerCase();
-        if (['98', '99', '94'].contains(prefix) && label.contains('airtel')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (['63', '70', '79', '89'].contains(prefix) && label.contains('jio')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (['90', '91', '97'].contains(prefix) && (label.contains('vi') || label.contains('vodafone'))) {
-          setState(() => _selectedOperator = op['label']);
-          break;
-        } else if (prefix == '94' && label.contains('bsnl')) {
-          setState(() => _selectedOperator = op['label']);
-          break;
+    String clean = value.replaceAll('+91', '').replaceAll(' ', '').trim();
+    if (clean.length == 10) {
+      _autoDetectOperator(clean);
+    }
+  }
+
+  Future<void> _autoDetectOperator(String cleanMobile) async {
+    setState(() => _isAutoDetecting = true);
+
+    try {
+      final res = await PrepaidApiService.fetchOperatorAndCircle(cleanMobile);
+      if (mounted && res['success'] == true) {
+        final detectedOp = (res['operator'] ?? '').toString().trim().toLowerCase();
+        if (detectedOp.isNotEmpty && _operators.isNotEmpty) {
+          final match = _operators.firstWhere(
+            (o) {
+              final lbl = (o['label'] ?? o['name'] ?? '').toString().toLowerCase();
+              final code = (o['code'] ?? '').toString().toLowerCase();
+              if (detectedOp.contains('jio') && (lbl.contains('jio') || code.contains('jio'))) return true;
+              if (detectedOp.contains('airtel') && (lbl.contains('airtel') || code.contains('airtel'))) return true;
+              if ((detectedOp.contains('vi') || detectedOp.contains('voda') || detectedOp.contains('idea')) &&
+                  (lbl.contains('vi') || lbl.contains('voda') || lbl.contains('idea') || code.contains('vi') || code.contains('voda') || code.contains('idea'))) {
+                return true;
+              }
+              if (detectedOp.contains('bsnl') && (lbl.contains('bsnl') || code.contains('bsnl'))) return true;
+              if (detectedOp.contains('mtnl') && (lbl.contains('mtnl') || code.contains('mtnl'))) return true;
+              return lbl.contains(detectedOp) || detectedOp.contains(lbl);
+            },
+            orElse: () => <String, dynamic>{},
+          );
+
+          setState(() {
+            if (match.isNotEmpty) {
+              _selectedOperator = (match['label'] ?? match['name'])?.toString();
+            }
+            _isAutoDetecting = false;
+          });
+          if (_selectedOperator != null) {
+            _showSnack('Auto-detected operator: $_selectedOperator');
+          }
+        } else {
+          setState(() => _isAutoDetecting = false);
         }
+      } else {
+        if (mounted) setState(() => _isAutoDetecting = false);
       }
+    } catch (_) {
+      if (mounted) setState(() => _isAutoDetecting = false);
     }
   }
 
@@ -115,46 +146,40 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
     try {
       final opData = _operators.firstWhere(
         (o) => o['label'] == _selectedOperator,
-        orElse: () => {'code': _selectedOperator ?? '', 'id': _selectedOperator ?? ''},
+        orElse: () => {'code': _selectedOperator ?? '', 'id': _selectedOperator ?? '', 'spkey': '108'},
       );
 
-      final res = await ApiService.postApi('/recharge/bill', {
-        'mobile_number': cleanMobile,
-        'operator_id': opData['id'] ?? opData['label'],
-        'operator_code': opData['code'] ?? '',
-      }, timeoutSeconds: 8);
+      final spKey = (opData['spkey'] ?? opData['id'] ?? '108').toString();
+      final bill = await BbpsApiService.fetchBill(
+        spKey: spKey,
+        account: cleanMobile,
+      );
 
-      final data = jsonDecode(res.body);
       if (mounted) {
         setState(() {
           _fetchingBill = false;
-          if (data['success'] == true && data['bill'] != null) {
-            _fetchedBillDetails = Map<String, dynamic>.from(data['bill']);
-            if (_fetchedBillDetails!['amount'] != null) {
-              _amountCtrl.text = _fetchedBillDetails!['amount'].toString();
-            }
-          } else {
-            // Default placeholder if bill fetch not configured by operator
+          if (bill.isSuccess && bill.dueAmount > 0) {
             _fetchedBillDetails = {
-              'customer_name': 'Subscriber',
-              'bill_number': 'BILL-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-              'due_date': 'Due in 7 Days',
+              'customer_name': bill.customerName.isNotEmpty ? bill.customerName : 'Postpaid Subscriber',
+              'bill_number': bill.billNumber.isNotEmpty ? bill.billNumber : 'BBPS-${DateTime.now().millisecondsSinceEpoch}',
+              'due_date': bill.dueDate.isNotEmpty ? bill.dueDate : 'Current Cycle',
+              'amount': bill.dueAmount,
             };
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+            _showSnack('Bill fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}');
+          } else {
+            _fetchedBillDetails = null;
+            _showSnack(bill.message.isNotEmpty ? bill.message : 'Please enter bill amount manually');
           }
         });
-        _showSnack('Bill status verified');
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _fetchingBill = false;
-          _fetchedBillDetails = {
-            'customer_name': 'Subscriber',
-            'bill_number': 'BILL-${DateTime.now().millisecondsSinceEpoch.toString().substring(6)}',
-            'due_date': 'Due in 7 Days',
-          };
+          _fetchedBillDetails = null;
         });
-        _showSnack('Enter bill amount to proceed');
+        _showSnack('Please enter your bill amount to proceed');
       }
     }
   }
@@ -368,7 +393,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
       width: double.infinity,
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + 10,
-        bottom: 20,
+        bottom: 16,
         left: 16,
         right: 16,
       ),
@@ -379,11 +404,10 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
           end: Alignment.bottomCenter,
         ),
       ),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: MediaQuery.of(context).size.width * 0.58,
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -408,64 +432,56 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE9FE),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'POSTPAID',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          color: primaryPurple,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'POSTPAID',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: primaryPurple,
+                      letterSpacing: 0.5,
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 6),
                 const Text(
                   'Postpaid Bill Pay',
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 24,
                     fontWeight: FontWeight.w900,
                     color: primaryDark,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 const Text(
                   'Instant postpaid bill fetch & secure settlement',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                     color: textSubdued,
                     height: 1.3,
                   ),
                 ),
-                const SizedBox(height: 20),
               ],
             ),
           ),
-          Positioned(
-            right: -15,
-            top: 25,
-            child: Image.asset(
-              'assets/Mobile.png',
-              width: 170,
-              height: 170,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(
-                Icons.phone_android_rounded,
-                size: 110,
-                color: Color(0xFFDDD6FE),
-              ),
+          const SizedBox(width: 8),
+          Image.asset(
+            'assets/Mobile.png',
+            width: 110,
+            height: 110,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.phone_android_rounded,
+              size: 80,
+              color: Color(0xFFDDD6FE),
             ),
           ),
         ],
@@ -497,12 +513,14 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Postpaid Connection',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: primaryDark,
+                const Expanded(
+                  child: Text(
+                    'Postpaid Connection',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w800,
+                      color: primaryDark,
+                    ),
                   ),
                 ),
                 TextButton.icon(
@@ -516,7 +534,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                   label: const Text(
                     'Switch to Prepaid',
                     style: TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: primaryPurple,
                     ),
@@ -600,7 +618,9 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                       child: Text(
                         _loadingOperators
                             ? 'Loading operators from database...'
-                            : (_selectedOperator ?? 'Select postpaid operator'),
+                            : _isAutoDetecting
+                                ? 'Detecting operator...'
+                                : (_selectedOperator ?? 'Select postpaid operator'),
                         style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -608,7 +628,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                         ),
                       ),
                     ),
-                    if (_loadingOperators)
+                    if (_loadingOperators || _isAutoDetecting)
                       const SizedBox(
                         width: 14,
                         height: 14,
@@ -788,6 +808,28 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
 
   Widget _buildResultView() {
     final isSuccess = _resultStatus == 'success';
+    final isPending = _resultStatus == 'pending';
+    final double rawDueAmt = double.tryParse(_fetchedBillDetails?['dueAmount']?.toString() ?? _fetchedBillDetails?['due_amount']?.toString() ?? '') ?? 0.0;
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? rawDueAmt;
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'Mobile Postpaid',
+      operatorName: _selectedOperator ?? 'Mobile Operator',
+      accountNumber: _mobileCtrl.text.replaceAll('+91 ', '').trim(),
+      customerName: _fetchedBillDetails?['customerName']?.toString() ?? _fetchedBillDetails?['customer_name']?.toString() ?? '',
+      merchantTxnId: _merchantTxnId ?? 'POST${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isSuccess ? 'Success' : 'Failed',
+      billNumber: _fetchedBillDetails?['billNumber']?.toString() ?? _fetchedBillDetails?['bill_number']?.toString(),
+      dueDate: _fetchedBillDetails?['dueDate']?.toString() ?? _fetchedBillDetails?['due_date']?.toString(),
+      billPeriod: _fetchedBillDetails?['billPeriod']?.toString() ?? _fetchedBillDetails?['bill_period']?.toString(),
+    );
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -824,7 +866,7 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _resultMessage ?? '',
+            (_resultMessage ?? '').replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim(),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 13.5, color: textSubdued, height: 1.4),
           ),
@@ -848,11 +890,69 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
+
+          // ── Download / View Bill Receipt & Share Buttons ──
+          if (isSuccess || isPending) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryPurple,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                    icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                    label: const Text('WhatsApp', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF25D366),
+                      side: const BorderSide(color: Color(0xFF25D366)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                    icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                    label: const Text('Email', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryPurple,
+                      side: const BorderSide(color: primaryPurple),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+
           SizedBox(
             width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
+            height: 46,
+            child: TextButton(
               onPressed: () {
                 setState(() {
                   _resultStatus = null;
@@ -861,12 +961,11 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                   _fetchedBillDetails = null;
                 });
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryPurple,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              style: TextButton.styleFrom(
+                foregroundColor: textSubdued,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              child: const Text('Pay Another Bill', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: const Text('Pay Another Bill', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],

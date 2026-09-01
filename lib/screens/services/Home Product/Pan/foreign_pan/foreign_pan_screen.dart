@@ -37,10 +37,10 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
   bool _fatherHasContent = false;
   bool _motherHasContent = false;
 
-  final List<String> _titles  = ["Shri", "Smt.", "Kumari", "M/s"];
+  List<String> _titles  = [];
   final List<String> _genders = ["Male", "Female", "Transgender"];
 
-  String? _applicantTitle = 'Shri';
+  String? _applicantTitle;
   String? _gender         = 'Male';
 
   // 1. Personal Info Controllers
@@ -91,22 +91,10 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
     );
     _animationController.forward();
 
-    void updateNameOnCard() {
-      final parts = [
-        _firstNameCtrl.text.trim(),
-        _middleNameCtrl.text.trim(),
-        _lastNameCtrl.text.trim(),
-      ].where((s) => s.isNotEmpty).join(' ');
-      _nameOnCardCtrl.text = parts;
-    }
-
-    _firstNameCtrl.addListener(updateNameOnCard);
-    _middleNameCtrl.addListener(updateNameOnCard);
-    _lastNameCtrl.addListener(updateNameOnCard);
-
     _fatherFirstNameCtrl.addListener(_updateParentVisibility);
     _motherFirstNameCtrl.addListener(_updateParentVisibility);
 
+    _loadMasterDataFromApi();
     _loadSavedUserData();
     _razorpayService.init();
   }
@@ -120,6 +108,21 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
         _motherHasContent = mHasText;
       });
     }
+  }
+
+  Future<void> _loadMasterDataFromApi() async {
+    try {
+      final resTitles = await ApiService.fetchApi('/pan/titles').catchError((_) => http.Response('{}', 500));
+      if (!mounted) return;
+      if (resTitles.statusCode == 200) {
+        final dTitles = jsonDecode(resTitles.body) as Map<String, dynamic>;
+        if (dTitles['success'] == true && dTitles['titles'] is List) {
+          _titles = (dTitles['titles'] as List).map((e) => e.toString()).toList();
+        }
+      }
+      if (_titles.isEmpty) _titles = ["Shri", "Smt.", "Kumari", "M/s"];
+      setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _loadSavedUserData() async {
@@ -552,12 +555,10 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
         ),
         const SizedBox(height: 14),
 
-        buildPanInput(
-          'Name on Card *',
+        buildPanDualNameOnCardField(
+          context,
           _nameOnCardCtrl,
-          placeholder: 'Name printed on card (auto-filled)',
-          prefixIcon: Icons.credit_card_outlined,
-          readOnly: true,
+          placeholder: 'NAME ON CARD',
         ),
         const SizedBox(height: 14),
 

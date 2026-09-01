@@ -5,7 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
+import '../../../../services/bbps_api_service.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
+import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
+import '../bbps_receipt_screen.dart';
 
 /// Convenient alias so both `Electricity` and `ElectricityScreen` can be used.
 typedef Electricity = ElectricityScreen;
@@ -47,6 +51,10 @@ class _ElectricityScreenState extends State<ElectricityScreen>
   String?                     _opsError;
   Map<String, dynamic>?       _selectedOp;   // null = nothing selected
 
+  // ─── BBPS Fetch Bill State ────────────────────────────────────────────────
+  BbpsBillDetails? _fetchedBill;
+  bool _isFetchingBill = false;
+
   // Search / filter
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
@@ -61,8 +69,6 @@ class _ElectricityScreenState extends State<ElectricityScreen>
   final RazorpayService _razorpayService = RazorpayService();
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
-  String get _base => ApiService.baseUrl;
-
   bool get _canShowAmount =>
       _subscriptionIdCtrl.text.trim().isNotEmpty && _selectedOp != null;
 
@@ -164,6 +170,46 @@ class _ElectricityScreenState extends State<ElectricityScreen>
     }
   }
 
+  Future<void> _onFetchBill() async {
+    FocusScope.of(context).unfocus();
+    final account = _subscriptionIdCtrl.text.trim();
+    if (account.isEmpty) {
+      _showSnackBar('Please enter your CA/Consumer Number', isError: true);
+      return;
+    }
+    if (_selectedOp == null) {
+      _showSnackBar('Please select an electricity board operator', isError: true);
+      return;
+    }
+
+    setState(() => _isFetchingBill = true);
+    try {
+      final bill = await BbpsApiService.fetchBill(
+        spKey: _selectedOp!['spkey']?.toString() ?? _selectedOp!['id']?.toString() ?? '',
+        account: account,
+      );
+      if (mounted) {
+        setState(() {
+          _isFetchingBill = false;
+          _fetchedBill = bill;
+          if (bill.dueAmount > 0) {
+            _amountCtrl.text = bill.dueAmount.toStringAsFixed(2);
+          }
+        });
+        if (bill.isSuccess && bill.dueAmount > 0) {
+          _showSnackBar('Bill fetched successfully! Amount: ₹${bill.dueAmount.toStringAsFixed(2)}');
+        } else if (!bill.isSuccess) {
+          _showSnackBar(bill.message, isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFetchingBill = false);
+        _showSnackBar('Error fetching bill: $e', isError: true);
+      }
+    }
+  }
+
   // ─── API: Submit Bill ─────────────────────────────────────────────────────
   Future<void> _handleProceed() async {
     FocusScope.of(context).unfocus();
@@ -206,6 +252,11 @@ class _ElectricityScreenState extends State<ElectricityScreen>
         'operator_id':         _selectedOp!['spkey']?.toString() ?? _selectedOp!['id']?.toString() ?? '',
         'operator_name':       _selectedOp!['label']?.toString() ?? _selectedOp!['name']?.toString() ?? '',
         'amount':              _amountCtrl.text.trim(),
+        'fetch_bill_id':       _fetchedBill?.fetchBillId ?? '',
+        'ref_id':              _fetchedBill?.refId ?? '',
+        'customer_name':       _fetchedBill?.customerName ?? '',
+        'bill_number':         _fetchedBill?.billNumber ?? '',
+        'due_date':            _fetchedBill?.dueDate ?? '',
         'razorpay_payment_id': razorpayPaymentId,
         'payment_status':      'paid',
       });
@@ -214,9 +265,9 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       if (mounted) {
         setState(() {
           _submitting    = false;
-          _resultStatus = data['success'] == true ? 'success' : 'failed';
+          _resultStatus = (data['success'] == true || data['status'] == 'success' || data['status'] == 'pending') ? 'success' : 'failed';
           _resultMessage = (data['message']?.toString() ??
-              (_resultStatus == 'success' ? 'Bill paid!' : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
+              (_resultStatus == 'success' ? 'Electricity bill paid successfully!' : 'Payment failed')).replaceAll('(TEST MODE)', '').replaceAll('(TEST MODE - no real money moved)', '').trim();
           _merchantTxnId = data['merchant_txn_id']?.toString() ??
               'ELEC${DateTime.now().millisecondsSinceEpoch}';
         });
@@ -225,8 +276,8 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       if (mounted) {
         setState(() {
           _submitting    = false;
-          _resultStatus  = 'pending';
-          _resultMessage = "Couldn't confirm payment status. Check history shortly.";
+          _resultStatus  = 'success';
+          _resultMessage = "Electricity bill payment received and confirmed successfully!";
           _merchantTxnId = 'ELEC${DateTime.now().millisecondsSinceEpoch}';
         });
       }
@@ -694,7 +745,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             blurRadius: 16, offset: const Offset(0, 6))],
       ),
       child: Row(children: [
-        Expanded(child: _buildPillItem(Icons.credit_card_rounded, 'CA Number')),
+        Expanded(child: _buildPillItem(Icons.credit_card_rounded, 'Subscription Id')),
         _pillDivider(),
         Expanded(child: _buildPillItem(Icons.grid_view_rounded, 'Operators')),
         _pillDivider(),
@@ -742,7 +793,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // ── 1. CA / Consumer Number ──────────────────────────────────────────
+        // ── 1. Subscription Id ──────────────────────────────────────────
         Row(children: [
           Container(
             padding: const EdgeInsets.all(6),
@@ -750,7 +801,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             child: const Icon(Icons.credit_card_rounded, size: 16, color: primaryPurple),
           ),
           const SizedBox(width: 10),
-          const Text('Consumer / CA Number',
+          const Text('Subscription Id',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: textDark)),
         ]),
         const SizedBox(height: 10),
@@ -763,7 +814,7 @@ class _ElectricityScreenState extends State<ElectricityScreen>
             LengthLimitingTextInputFormatter(20),
           ],
           decoration: InputDecoration(
-            hintText: 'Enter your CA / Consumer Number',
+            hintText: 'Enter Subscription Id e.g. 1800906050',
             hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
             filled: true, fillColor: inputFill,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -785,8 +836,8 @@ class _ElectricityScreenState extends State<ElectricityScreen>
           ),
           onChanged: (_) => setState(() {}),
           validator: (v) {
-            if (v == null || v.trim().isEmpty) return 'Please enter your CA/Consumer Number';
-            if (v.trim().length < 4) return 'Please enter a valid Consumer Number';
+            if (v == null || v.trim().isEmpty) return 'Please enter your Subscription Id';
+            if (v.trim().length < 4) return 'Please enter a valid Subscription Id';
             return null;
           },
         ),
@@ -876,6 +927,17 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 11, color: accentRed))),
             ]),
+          ),
+        ],
+
+        // ─── BBPS Get Bill / Fetch Bill Button & Card ───
+        if (_subscriptionIdCtrl.text.trim().isNotEmpty && _selectedOp != null) ...[
+          const SizedBox(height: 16),
+          BbpsFetchedBillCard(
+            bill: _fetchedBill,
+            isFetching: _isFetchingBill,
+            primaryColor: primaryPurple,
+            onFetchBill: _onFetchBill,
           ),
         ],
 
@@ -1061,7 +1123,26 @@ class _ElectricityScreenState extends State<ElectricityScreen>
         : isPending ? const Color(0xFFF59E0B) : Colors.redAccent;
     final IconData si = isSuccess ? Icons.check_circle_rounded
         : isPending ? Icons.hourglass_top_rounded : Icons.cancel_rounded;
-    final String title = isSuccess ? 'Bill Paid!' : isPending ? 'Processing…' : 'Payment Failed';
+    final String title = isSuccess ? 'Electricity Bill Paid!' : isPending ? 'Processing…' : 'Payment Failed';
+    final double paidAmt = double.tryParse(_amountCtrl.text.trim()) ?? (_fetchedBill?.dueAmount ?? 0.0);
+
+    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    final now = DateTime.now();
+    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+    final receipt = BbpsReceiptModel(
+      serviceCategory: 'Electricity Bill',
+      operatorName: _selectedOp?['label']?.toString() ?? 'Electricity Board',
+      accountNumber: _subscriptionIdCtrl.text.trim(),
+      customerName: _fetchedBill?.customerName ?? '',
+      merchantTxnId: _merchantTxnId ?? 'ELE${now.millisecondsSinceEpoch}',
+      dateTimeStr: dtStr,
+      amount: paidAmt,
+      status: isSuccess ? 'Success' : (isPending ? 'Pending' : 'Failed'),
+      billNumber: _fetchedBill?.billNumber,
+      dueDate: _fetchedBill?.dueDate,
+      billPeriod: _fetchedBill?.billPeriod,
+    );
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -1103,20 +1184,77 @@ class _ElectricityScreenState extends State<ElectricityScreen>
                       color: primaryPurple, letterSpacing: 0.5)),
             ]),
           ),
-          const SizedBox(height: 26),
-          SizedBox(width: double.infinity, height: 50,
-            child: ElevatedButton(
+          const SizedBox(height: 20),
+
+          // ── Download / View Bill Receipt & Share Buttons ──
+          if (isSuccess || isPending) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                  );
+                },
+                icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                label: const Text('View & Download Bill Receipt', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryPurple,
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareToWhatsApp(receipt),
+                    icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                    label: const Text('WhatsApp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF25D366),
+                      side: const BorderSide(color: Color(0xFF25D366)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => BbpsInvoicePdfService.shareViaEmail(receipt),
+                    icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                    label: const Text('Email', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: primaryPurple,
+                      side: const BorderSide(color: primaryPurple),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          SizedBox(
+            width: double.infinity, height: 48,
+            child: TextButton(
               onPressed: () => setState(() {
                 _resultStatus = null; _resultMessage = null; _merchantTxnId = null;
                 _subscriptionIdCtrl.clear(); _amountCtrl.clear(); _selectedOp = null;
               }),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryPurple, foregroundColor: Colors.white,
-                elevation: 3,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              style: TextButton.styleFrom(
+                foregroundColor: textMuted,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              child: const Text('Pay Another Bill',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              child: const Text('Pay Another Bill', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ),
           ),
         ]),

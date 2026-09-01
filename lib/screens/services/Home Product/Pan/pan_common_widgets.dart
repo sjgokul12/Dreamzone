@@ -656,10 +656,113 @@ Widget buildPanDropdown(
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
         ),
         items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: textDarkHeading), overflow: TextOverflow.ellipsis))).toList(),
         onChanged: onChanged,
         validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
+      ),
+    ],
+  );
+}
+
+Widget buildPanDualNameOnCardField(
+  BuildContext context,
+  TextEditingController controller, {
+  String label = 'Name On Card *',
+  String placeholder = 'NAME ON CARD',
+}) {
+  final isReq = label.contains('*');
+  final cleanLabel = label.replaceAll('*', '').trim();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text.rich(
+        TextSpan(
+          text: cleanLabel,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
+          children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+        ),
+      ),
+      const SizedBox(height: 6),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 550;
+          final inputWidget = TextFormField(
+            controller: controller,
+            textCapitalization: TextCapitalization.characters,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+            decoration: InputDecoration(
+              hintText: placeholder,
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              prefixIcon: const Icon(Icons.credit_card_outlined, color: primaryPurple, size: 20),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              fillColor: const Color(0xFFFAFAFA),
+              filled: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+            ),
+            validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+          );
+
+          final previewWidget = ValueListenableBuilder<TextEditingValue>(
+            valueListenable: controller,
+            builder: (context, val, _) {
+              final displayText = val.text.trim().isEmpty ? placeholder : val.text.toUpperCase();
+              final isPlaceholder = val.text.trim().isEmpty;
+              return Container(
+                height: 52,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.badge_outlined, color: isPlaceholder ? const Color(0xFF94A3B8) : primaryPurple, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        displayText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: isPlaceholder ? const Color(0xFF94A3B8) : const Color(0xFF334155),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+
+          return isWide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 6, child: inputWidget),
+                    const SizedBox(width: 12),
+                    Expanded(flex: 5, child: previewWidget),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    inputWidget,
+                    const SizedBox(height: 10),
+                    previewWidget,
+                  ],
+                );
+        },
       ),
     ],
   );

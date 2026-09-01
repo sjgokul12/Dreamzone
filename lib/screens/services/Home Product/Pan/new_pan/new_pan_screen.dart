@@ -38,24 +38,35 @@ class _NewPanScreenState extends State<NewPanScreen>
   bool _motherHasContent = false;
   bool _isMinor = false;
 
-  // Dynamic Masters
-  List<String> _titles     = ["Shri", "Smt.", "Kumari", "M/s"];
-  List<String> _categories = ["Individual", "Body of Individuals (BOI)", "Partnership Firm", "Government", "Association of Persons (AOP)", "Trust (AOP)", "Hindu undivided family (HUF)", "Company"];
-  List<String> _genders    = ["Male", "Female", "Transgender"];
-  List<String> _states     = ["Andaman and Nicobar Islands","Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chandigarh","Chhattisgarh","Dadra and Nagar Haveli","Daman and Diu","Delhi","Goa","Gujarat","Haryana","Himachal Pradesh","Jammu and Kashmir","Jharkhand","Karnataka","Kerala","Lakshadweep","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Pondicherry","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal"];
+  // Dynamic Masters from Database API
+  List<String> _titles     = [];
+  List<String> _categories = [];
+  List<String> _genders    = [];
+  List<String> _states     = [];
 
   String? _applicantTitle;
   String? _applicantCategory;
   String? _gender = 'Male';
   String? _panDeliveryState;
 
-  // 1. AO Code Controllers
+  // Check if current category is Company / Non-Individual group
+  bool get _isCompanyGroup {
+    final cat = _applicantCategory ?? '';
+    return cat == 'Company' ||
+           cat == 'Partnership Firm' ||
+           cat == 'Government' ||
+           cat == 'Association of Persons (AOP)' ||
+           cat == 'Trust (AOP)';
+  }
+
+  // 1. AO Code Controllers (Non-mandatory)
   final TextEditingController _aoCodeCtrl    = TextEditingController();
   final TextEditingController _aoTypeCtrl    = TextEditingController();
   final TextEditingController _rangeCodeCtrl = TextEditingController();
   final TextEditingController _aoNoCtrl      = TextEditingController();
 
   // 2. Personal Info Controllers
+  // Individual / BOI / HUF
   final TextEditingController _firstNameCtrl       = TextEditingController();
   final TextEditingController _middleNameCtrl      = TextEditingController();
   final TextEditingController _lastNameCtrl        = TextEditingController();
@@ -69,6 +80,11 @@ class _NewPanScreenState extends State<NewPanScreen>
   final TextEditingController _dobCtrl             = TextEditingController();
   final TextEditingController _aadhaarCtrl         = TextEditingController();
   final TextEditingController _nameInAadhaarCtrl   = TextEditingController();
+
+  // Company / Firm / Trust / Govt / AOP
+  final TextEditingController _companyNameCtrl     = TextEditingController();
+  final TextEditingController _regNoCtrl           = TextEditingController();
+  final TextEditingController _regDateCtrl         = TextEditingController();
 
   // 3. Contact Info Controllers
   final TextEditingController _mobileCtrl = TextEditingController();
@@ -103,19 +119,6 @@ class _NewPanScreenState extends State<NewPanScreen>
     );
     _animationController.forward();
 
-    void updateNameOnCard() {
-      final parts = [
-        _firstNameCtrl.text.trim(),
-        _middleNameCtrl.text.trim(),
-        _lastNameCtrl.text.trim(),
-      ].where((s) => s.isNotEmpty).join(' ');
-      _nameOnCardCtrl.text = parts;
-    }
-
-    _firstNameCtrl.addListener(updateNameOnCard);
-    _middleNameCtrl.addListener(updateNameOnCard);
-    _lastNameCtrl.addListener(updateNameOnCard);
-
     _fatherFirstNameCtrl.addListener(_updateParentVisibility);
     _motherFirstNameCtrl.addListener(_updateParentVisibility);
 
@@ -137,26 +140,54 @@ class _NewPanScreenState extends State<NewPanScreen>
 
   Future<void> _loadMasterDataFromApi() async {
     try {
-      final resTitles = await ApiService.fetchApi('/pan/titles');
-      final dTitles = jsonDecode(resTitles.body) as Map<String, dynamic>;
-      if (dTitles['success'] == true && dTitles['titles'] != null && mounted) {
-        setState(() => _titles = (dTitles['titles'] as List).map((e) => e.toString()).toList());
+      final results = await Future.wait([
+        ApiService.fetchApi('/pan/titles').catchError((_) => http.Response('{}', 500)),
+        ApiService.fetchApi('/pan/categories').catchError((_) => http.Response('{}', 500)),
+        ApiService.fetchApi('/pan/genders').catchError((_) => http.Response('{}', 500)),
+        ApiService.fetchApi('/pan/states').catchError((_) => http.Response('{}', 500)),
+      ]);
+
+      if (!mounted) return;
+
+      final resTitles = results[0];
+      if (resTitles.statusCode == 200) {
+        final d = jsonDecode(resTitles.body);
+        if (d['success'] == true && d['titles'] is List) {
+          _titles = (d['titles'] as List).map((e) => e.toString()).toList();
+        }
       }
-      final resCats = await ApiService.fetchApi('/pan/categories');
-      final dCats = jsonDecode(resCats.body) as Map<String, dynamic>;
-      if (dCats['success'] == true && dCats['categories'] != null && mounted) {
-        setState(() => _categories = (dCats['categories'] as List).map((e) => e.toString()).toList());
+
+      final resCats = results[1];
+      if (resCats.statusCode == 200) {
+        final d = jsonDecode(resCats.body);
+        if (d['success'] == true && d['categories'] is List) {
+          _categories = (d['categories'] as List).map((e) => e.toString()).toList();
+        }
       }
-      final resGen = await ApiService.fetchApi('/pan/genders');
-      final dGen = jsonDecode(resGen.body) as Map<String, dynamic>;
-      if (dGen['success'] == true && dGen['genders'] != null && mounted) {
-        setState(() => _genders = (dGen['genders'] as List).map((e) => e.toString()).toList());
+
+      final resGen = results[2];
+      if (resGen.statusCode == 200) {
+        final d = jsonDecode(resGen.body);
+        if (d['success'] == true && d['genders'] is List) {
+          _genders = (d['genders'] as List).map((e) => e.toString()).toList();
+        }
       }
-      final resStates = await ApiService.fetchApi('/pan/states');
-      final dStates = jsonDecode(resStates.body) as Map<String, dynamic>;
-      if (dStates['success'] == true && dStates['states'] != null && mounted) {
-        setState(() => _states = (dStates['states'] as List).map((e) => e.toString()).toList());
+
+      final resStates = results[3];
+      if (resStates.statusCode == 200) {
+        final d = jsonDecode(resStates.body);
+        if (d['success'] == true && d['states'] is List) {
+          _states = (d['states'] as List).map((e) => e.toString()).toList();
+        }
       }
+
+      // Safe fallback if server is unreachable
+      if (_titles.isEmpty) _titles = ["Shri", "Smt.", "Kumari", "M/s"];
+      if (_categories.isEmpty) _categories = ["Individual", "Body of Individuals (BOI)", "Hindu undivided family (HUF)", "Company", "Partnership Firm", "Government", "Association of Persons (AOP)", "Trust (AOP)"];
+      if (_genders.isEmpty) _genders = ["Male", "Female", "Transgender"];
+      if (_states.isEmpty) _states = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli", "Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Pondicherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"];
+
+      setState(() {});
     } catch (_) {}
   }
 
@@ -206,6 +237,9 @@ class _NewPanScreenState extends State<NewPanScreen>
     _dobCtrl.dispose();
     _aadhaarCtrl.dispose();
     _nameInAadhaarCtrl.dispose();
+    _companyNameCtrl.dispose();
+    _regNoCtrl.dispose();
+    _regDateCtrl.dispose();
     _mobileCtrl.dispose();
     _emailCtrl.dispose();
     _commHouseNoCtrl.dispose();
@@ -307,7 +341,7 @@ class _NewPanScreenState extends State<NewPanScreen>
 
   Future<void> _submitPanForm() async {
     if (!_formKey.currentState!.validate()) {
-      setState(() => _expandedSectionIndex = 0);
+      setState(() => _expandedSectionIndex = 1); // Expand Personal Information if invalid
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('⚠️ Please fill all required fields correctly'),
@@ -316,6 +350,38 @@ class _NewPanScreenState extends State<NewPanScreen>
         ),
       );
       return;
+    }
+
+    // Validate documents
+    if (_isCompanyGroup) {
+      if (!_uploadedDocs.containsKey('doc_registration_deed') ||
+          !_uploadedDocs.containsKey('doc_form_front') ||
+          !_uploadedDocs.containsKey('doc_form_back')) {
+        setState(() => _expandedSectionIndex = 4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('⚠️ Please upload Registration/Deed, Form Front & Back Page'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    } else {
+      if (!_uploadedDocs.containsKey('doc_aadhaar') ||
+          !_uploadedDocs.containsKey('doc_form_front') ||
+          !_uploadedDocs.containsKey('doc_form_back') ||
+          !_uploadedDocs.containsKey('doc_dob_proof')) {
+        setState(() => _expandedSectionIndex = 4);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('⚠️ Please upload Aadhaar, Form Front & Back, and Proof of D.O.B'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
     }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -368,20 +434,23 @@ class _NewPanScreenState extends State<NewPanScreen>
       'ao_no':                  _aoNoCtrl.text.trim(),
       'applicant_category':     _applicantCategory ?? '',
       'applicant_title':        _applicantTitle ?? '',
-      'first_name':             _firstNameCtrl.text.trim(),
-      'middle_name':            _middleNameCtrl.text.trim(),
-      'last_name':              _lastNameCtrl.text.trim(),
-      'selected_parent':        _fatherHasContent ? 'Father' : (_motherHasContent ? 'Mother' : 'None'),
-      'father_first_name':      _fatherHasContent ? _fatherFirstNameCtrl.text.trim() : '',
-      'father_middle_name':     _fatherHasContent ? _fatherMiddleNameCtrl.text.trim() : '',
-      'father_last_name':       _fatherHasContent ? _fatherLastNameCtrl.text.trim() : '',
-      'mother_first_name':      _motherHasContent ? _motherFirstNameCtrl.text.trim() : '',
-      'mother_middle_name':     _motherHasContent ? _motherMiddleNameCtrl.text.trim() : '',
-      'mother_last_name':       _motherHasContent ? _motherLastNameCtrl.text.trim() : '',
-      'dob_or_est_date':        _dobCtrl.text.trim(),
-      'gender':                 _gender ?? '',
-      'aadhaar_number':         _aadhaarCtrl.text.trim(),
-      'name_in_aadhaar':        _nameInAadhaarCtrl.text.trim(),
+      'first_name':             _isCompanyGroup ? _companyNameCtrl.text.trim() : _firstNameCtrl.text.trim(),
+      'middle_name':            _isCompanyGroup ? '' : _middleNameCtrl.text.trim(),
+      'last_name':              _isCompanyGroup ? '' : _lastNameCtrl.text.trim(),
+      'company_name':           _isCompanyGroup ? _companyNameCtrl.text.trim() : '',
+      'registration_number':    _isCompanyGroup ? _regNoCtrl.text.trim() : '',
+      'date_of_registration':   _isCompanyGroup ? _regDateCtrl.text.trim() : '',
+      'selected_parent':        _isCompanyGroup ? 'None' : (_fatherHasContent ? 'Father' : (_motherHasContent ? 'Mother' : 'None')),
+      'father_first_name':      _isCompanyGroup ? '' : (_fatherHasContent ? _fatherFirstNameCtrl.text.trim() : ''),
+      'father_middle_name':     _isCompanyGroup ? '' : (_fatherHasContent ? _fatherMiddleNameCtrl.text.trim() : ''),
+      'father_last_name':       _isCompanyGroup ? '' : (_fatherHasContent ? _fatherLastNameCtrl.text.trim() : ''),
+      'mother_first_name':      _isCompanyGroup ? '' : (_motherHasContent ? _motherFirstNameCtrl.text.trim() : ''),
+      'mother_middle_name':     _isCompanyGroup ? '' : (_motherHasContent ? _motherMiddleNameCtrl.text.trim() : ''),
+      'mother_last_name':       _isCompanyGroup ? '' : (_motherHasContent ? _motherLastNameCtrl.text.trim() : ''),
+      'dob_or_est_date':        _isCompanyGroup ? _regDateCtrl.text.trim() : _dobCtrl.text.trim(),
+      'gender':                 _isCompanyGroup ? '' : (_gender ?? ''),
+      'aadhaar_number':         _isCompanyGroup ? '' : _aadhaarCtrl.text.trim(),
+      'name_in_aadhaar':        _isCompanyGroup ? '' : _nameInAadhaarCtrl.text.trim(),
       'name_on_card':           _nameOnCardCtrl.text.trim(),
       'mobile_number':          _mobileCtrl.text.trim(),
       'email_id':               _emailCtrl.text.trim(),
@@ -397,7 +466,7 @@ class _NewPanScreenState extends State<NewPanScreen>
       'amount':                 _payableAmount.toStringAsFixed(2),
       'razorpay_payment_id':    razorpayPaymentId,
       'payment_status':         'paid',
-      'is_minor':               _isMinor,
+      'is_minor':               _isCompanyGroup ? false : _isMinor,
     };
 
     try {
@@ -511,11 +580,11 @@ class _NewPanScreenState extends State<NewPanScreen>
   Widget _buildStepsAccordion() {
     return Column(
       children: [
-        // 1. AO Code Details (TOP!)
+        // 1. AO Code Details (Not Mandatory)
         PanAccordionSection(
           index: 0,
           currentIndex: _expandedSectionIndex,
-          title: '1. AO Code Details',
+          title: '1. AO Code Details (Optional)',
           subtitle: 'Assessing Officer information (AO Code, Type, Range, No.)',
           leadingIcon: Icons.badge_outlined,
           onToggle: (idx) => setState(() => _expandedSectionIndex = idx),
@@ -523,14 +592,14 @@ class _NewPanScreenState extends State<NewPanScreen>
             children: [
               buildPanResponsiveRow(
                 context,
-                buildPanInput('AO CODE *', _aoCodeCtrl, placeholder: 'Assessing Officer Code'),
-                buildPanInput('AO Type *', _aoTypeCtrl, placeholder: 'AO Type'),
+                buildPanInput('AO CODE', _aoCodeCtrl, placeholder: 'Assessing Officer Code'),
+                buildPanInput('AO Type', _aoTypeCtrl, placeholder: 'AO Type'),
               ),
               const SizedBox(height: 14),
               buildPanResponsiveRow(
                 context,
-                buildPanInput('Range Code *', _rangeCodeCtrl, placeholder: 'Range Code'),
-                buildPanInput('AO No. *', _aoNoCtrl, placeholder: 'AO Number'),
+                buildPanInput('Range Code', _rangeCodeCtrl, placeholder: 'Range Code'),
+                buildPanInput('AO No.', _aoNoCtrl, placeholder: 'AO Number'),
               ),
             ],
           ),
@@ -541,7 +610,9 @@ class _NewPanScreenState extends State<NewPanScreen>
           index: 1,
           currentIndex: _expandedSectionIndex,
           title: '2. Personal Information',
-          subtitle: 'Applicant details, Name on Card, Parent details & DOB',
+          subtitle: _isCompanyGroup
+              ? 'Company/Trust name, Registration details & Name on Card'
+              : 'Applicant details, Name on Card, Parent details & DOB',
           leadingIcon: Icons.person_outline,
           onToggle: (idx) => setState(() => _expandedSectionIndex = idx),
           child: _buildPersonalInfoStep(),
@@ -586,54 +657,17 @@ class _NewPanScreenState extends State<NewPanScreen>
           child: _buildAddressStep(),
         ),
 
-        // 5. Upload Required Documents (4 Docs)
+        // 5. Upload Required Documents
         PanAccordionSection(
           index: 4,
           currentIndex: _expandedSectionIndex,
           title: '5. Upload Required Documents',
-          subtitle: 'Aadhaar, New Form Front/Back, Proof of D.O.B',
+          subtitle: _isCompanyGroup
+              ? 'Registration/Deed, New Form Front & Back Page'
+              : 'Aadhaar, New Form Front/Back, Proof of D.O.B',
           leadingIcon: Icons.cloud_upload_outlined,
           onToggle: (idx) => setState(() => _expandedSectionIndex = idx),
-          child: Column(
-            children: [
-              buildPanDocUploadCard(
-                title: 'Aadhaar *',
-                docKey: 'doc_aadhaar',
-                uploadedDocs: _uploadedDocs,
-                onPick: () => _pickFile('doc_aadhaar'),
-                onRemove: () => setState(() => _uploadedDocs.remove('doc_aadhaar')),
-              ),
-              buildPanDocUploadCard(
-                title: 'New Form Front Page *',
-                docKey: 'doc_form_front',
-                uploadedDocs: _uploadedDocs,
-                onPick: () => _pickFile('doc_form_front'),
-                onRemove: () => setState(() => _uploadedDocs.remove('doc_form_front')),
-              ),
-              buildPanDocUploadCard(
-                title: 'New Form Back Page *',
-                docKey: 'doc_form_back',
-                uploadedDocs: _uploadedDocs,
-                onPick: () => _pickFile('doc_form_back'),
-                onRemove: () => setState(() => _uploadedDocs.remove('doc_form_back')),
-              ),
-              buildPanDocUploadCard(
-                title: 'Proof Of D.O.B *',
-                docKey: 'doc_dob_proof',
-                uploadedDocs: _uploadedDocs,
-                onPick: () => _pickFile('doc_dob_proof'),
-                onRemove: () => setState(() => _uploadedDocs.remove('doc_dob_proof')),
-              ),
-              if (_isMinor)
-                buildPanDocUploadCard(
-                  title: 'Father/Mother Aadhaar Card *',
-                  docKey: 'doc_minor_parent_aadhaar',
-                  uploadedDocs: _uploadedDocs,
-                  onPick: () => _pickFile('doc_minor_parent_aadhaar'),
-                  onRemove: () => setState(() => _uploadedDocs.remove('doc_minor_parent_aadhaar')),
-                ),
-            ],
-          ),
+          child: _buildDocumentUploadStep(),
         ),
 
         // 6. Payment Details
@@ -655,8 +689,7 @@ class _NewPanScreenState extends State<NewPanScreen>
   }
 
   Widget _buildPersonalInfoStep() {
-    final showFullDetails = (_applicantCategory != null && _applicantCategory!.isNotEmpty) ||
-                            (_applicantTitle != null && _applicantTitle!.isNotEmpty);
+    final hasCategorySelected = _applicantCategory != null && _applicantCategory!.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,7 +700,22 @@ class _NewPanScreenState extends State<NewPanScreen>
             'Applicant Category *',
             _applicantCategory,
             _categories,
-            (v) => setState(() => _applicantCategory = v),
+            (v) {
+              setState(() {
+                _applicantCategory = v;
+                // If switching between groups, refresh Name on Card
+                if (_isCompanyGroup) {
+                  _nameOnCardCtrl.text = _companyNameCtrl.text.trim();
+                } else {
+                  final parts = [
+                    _firstNameCtrl.text.trim(),
+                    _middleNameCtrl.text.trim(),
+                    _lastNameCtrl.text.trim(),
+                  ].where((s) => s.isNotEmpty).join(' ');
+                  _nameOnCardCtrl.text = parts;
+                }
+              });
+            },
             hint: 'Select Category',
             prefixIcon: Icons.category_outlined,
           ),
@@ -682,100 +730,206 @@ class _NewPanScreenState extends State<NewPanScreen>
         ),
         const SizedBox(height: 14),
 
-        if (showFullDetails) ...[
-          const Text("Applicant's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
-          const SizedBox(height: 8),
-          buildPanThreeColumnRow(
-            context,
-            buildPanInput('First Name *', _firstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
-            buildPanInput('Middle Name', _middleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
-            buildPanInput('Last Name', _lastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
-          ),
-          const SizedBox(height: 14),
-
-          buildPanInput(
-            'Name on Card *',
-            _nameOnCardCtrl,
-            placeholder: 'Name printed on card (auto-filled)',
-            prefixIcon: Icons.credit_card_outlined,
-            readOnly: true,
-          ),
-          const SizedBox(height: 14),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F3FF),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: primaryPurple.withValues(alpha: 0.12)),
+        if (hasCategorySelected) ...[
+          // --- COMPANY / FIRM / GOVT / AOP / TRUST FIELDS ---
+          if (_isCompanyGroup) ...[
+            buildPanInput(
+              'Company/Trust Name *',
+              _companyNameCtrl,
+              placeholder: 'Company / Trust / Firm / Govt Entity Name',
+              prefixIcon: Icons.business_outlined,
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.12), shape: BoxShape.circle),
-                  child: const Icon(Icons.info_outline, color: primaryPurple, size: 16),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Fill Father or Mother details. The other will auto-hide.',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textLabelDark),
+            const SizedBox(height: 14),
+
+            buildPanDualNameOnCardField(
+              context,
+              _nameOnCardCtrl,
+              placeholder: 'NAME ON CARD',
+            ),
+            const SizedBox(height: 14),
+
+            buildPanResponsiveRow(
+              context,
+              buildPanDateField(
+                context,
+                'Date of Registration *',
+                _regDateCtrl,
+              ),
+              buildPanInput(
+                'Registration Number *',
+                _regNoCtrl,
+                placeholder: 'Registration / Deed / CIN Number',
+                prefixIcon: Icons.app_registration_outlined,
+              ),
+            ),
+          ]
+
+          // --- INDIVIDUAL / BOI / HUF FIELDS ---
+          else ...[
+            const Text("Applicant's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
+            const SizedBox(height: 8),
+            buildPanThreeColumnRow(
+              context,
+              buildPanInput('First Name *', _firstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
+              buildPanInput('Middle Name', _middleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
+              buildPanInput('Last Name', _lastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+            ),
+            const SizedBox(height: 14),
+
+            buildPanDualNameOnCardField(
+              context,
+              _nameOnCardCtrl,
+              placeholder: 'NAME ON CARD',
+            ),
+            const SizedBox(height: 14),
+
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F3FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: primaryPurple.withValues(alpha: 0.12)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: primaryPurple.withValues(alpha: 0.12), shape: BoxShape.circle),
+                    child: const Icon(Icons.info_outline, color: primaryPurple, size: 16),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          if (!_motherHasContent) ...[
-            const Text("Father's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
-            const SizedBox(height: 8),
-            buildPanThreeColumnRow(
-              context,
-              buildPanInput('Father First Name', _fatherFirstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
-              buildPanInput('Father Middle Name', _fatherMiddleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
-              buildPanInput('Father Last Name', _fatherLastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Fill Father or Mother details. The other will auto-hide.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textLabelDark),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
-          ],
 
-          if (!_fatherHasContent) ...[
-            const Text("Mother's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
-            const SizedBox(height: 8),
-            buildPanThreeColumnRow(
+            if (!_motherHasContent) ...[
+              const Text("Father's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
+              const SizedBox(height: 8),
+              buildPanThreeColumnRow(
+                context,
+                buildPanInput('Father First Name', _fatherFirstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
+                buildPanInput('Father Middle Name', _fatherMiddleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
+                buildPanInput('Father Last Name', _fatherLastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            if (!_fatherHasContent) ...[
+              const Text("Mother's Name Details", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark)),
+              const SizedBox(height: 8),
+              buildPanThreeColumnRow(
+                context,
+                buildPanInput('Mother First Name', _motherFirstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
+                buildPanInput('Mother Middle Name', _motherMiddleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
+                buildPanInput('Mother Last Name', _motherLastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            buildPanResponsiveRow(
               context,
-              buildPanInput('Mother First Name', _motherFirstNameCtrl, placeholder: 'First Name', prefixIcon: Icons.person_outline),
-              buildPanInput('Mother Middle Name', _motherMiddleNameCtrl, placeholder: 'Middle Name', prefixIcon: Icons.person_outline),
-              buildPanInput('Mother Last Name', _motherLastNameCtrl, placeholder: 'Last Name', prefixIcon: Icons.person_outline),
+              buildPanDateField(
+                context,
+                'Date of Birth *',
+                _dobCtrl,
+                onDatePicked: (picked) {
+                  final now = DateTime.now();
+                  int age = now.year - picked.year;
+                  if (now.month < picked.month || (now.month == picked.month && now.day < picked.day)) age--;
+                  setState(() => _isMinor = age < 18);
+                  if (_isMinor) _showMinorWarningDialog();
+                },
+              ),
+              buildPanDropdown('Gender *', _gender, _genders, (v) => setState(() => _gender = v), prefixIcon: Icons.wc_outlined),
             ),
             const SizedBox(height: 14),
-          ],
 
-          buildPanResponsiveRow(
-            context,
-            buildPanDateField(
+            buildPanResponsiveRow(
               context,
-              'Date of Birth *',
-              _dobCtrl,
-              onDatePicked: (picked) {
-                final now = DateTime.now();
-                int age = now.year - picked.year;
-                if (now.month < picked.month || (now.month == picked.month && now.day < picked.day)) age--;
-                setState(() => _isMinor = age < 18);
-                if (_isMinor) _showMinorWarningDialog();
-              },
+              buildPanInput('Aadhaar Number *', _aadhaarCtrl, isNum: true, placeholder: '12-digit Aadhaar No.', prefixIcon: Icons.assignment_ind_outlined),
+              buildPanInput('Name in Aadhaar *', _nameInAadhaarCtrl, placeholder: 'Exact name as per Aadhaar', prefixIcon: Icons.person_outline),
             ),
-            buildPanDropdown('Gender *', _gender, _genders, (v) => setState(() => _gender = v), prefixIcon: Icons.wc_outlined),
-          ),
-          const SizedBox(height: 14),
+          ],
+        ],
+      ],
+    );
+  }
 
-          buildPanResponsiveRow(
-            context,
-            buildPanInput('Aadhaar Number *', _aadhaarCtrl, isNum: true, placeholder: '12-digit Aadhaar No.', prefixIcon: Icons.assignment_ind_outlined),
-            buildPanInput('Name in Aadhaar *', _nameInAadhaarCtrl, placeholder: 'Exact name as per Aadhaar', prefixIcon: Icons.person_outline),
+  Widget _buildDocumentUploadStep() {
+    if (_isCompanyGroup) {
+      return Column(
+        children: [
+          buildPanDocUploadCard(
+            title: 'Registration/Deed *',
+            docKey: 'doc_registration_deed',
+            uploadedDocs: _uploadedDocs,
+            onPick: () => _pickFile('doc_registration_deed'),
+            onRemove: () => setState(() => _uploadedDocs.remove('doc_registration_deed')),
+          ),
+          buildPanDocUploadCard(
+            title: 'New Form Front Page *',
+            docKey: 'doc_form_front',
+            uploadedDocs: _uploadedDocs,
+            onPick: () => _pickFile('doc_form_front'),
+            onRemove: () => setState(() => _uploadedDocs.remove('doc_form_front')),
+          ),
+          buildPanDocUploadCard(
+            title: 'New Form Back Page *',
+            docKey: 'doc_form_back',
+            uploadedDocs: _uploadedDocs,
+            onPick: () => _pickFile('doc_form_back'),
+            onRemove: () => setState(() => _uploadedDocs.remove('doc_form_back')),
           ),
         ],
+      );
+    }
+
+    // Individual / BOI / HUF Documents
+    return Column(
+      children: [
+        buildPanDocUploadCard(
+          title: 'Aadhaar *',
+          docKey: 'doc_aadhaar',
+          uploadedDocs: _uploadedDocs,
+          onPick: () => _pickFile('doc_aadhaar'),
+          onRemove: () => setState(() => _uploadedDocs.remove('doc_aadhaar')),
+        ),
+        buildPanDocUploadCard(
+          title: 'New Form Front Page *',
+          docKey: 'doc_form_front',
+          uploadedDocs: _uploadedDocs,
+          onPick: () => _pickFile('doc_form_front'),
+          onRemove: () => setState(() => _uploadedDocs.remove('doc_form_front')),
+        ),
+        buildPanDocUploadCard(
+          title: 'New Form Back Page *',
+          docKey: 'doc_form_back',
+          uploadedDocs: _uploadedDocs,
+          onPick: () => _pickFile('doc_form_back'),
+          onRemove: () => setState(() => _uploadedDocs.remove('doc_form_back')),
+        ),
+        buildPanDocUploadCard(
+          title: 'Proof Of D.O.B *',
+          docKey: 'doc_dob_proof',
+          uploadedDocs: _uploadedDocs,
+          onPick: () => _pickFile('doc_dob_proof'),
+          onRemove: () => setState(() => _uploadedDocs.remove('doc_dob_proof')),
+        ),
+        if (_isMinor)
+          buildPanDocUploadCard(
+            title: 'Father/Mother Aadhaar Card *',
+            docKey: 'doc_minor_parent_aadhaar',
+            uploadedDocs: _uploadedDocs,
+            onPick: () => _pickFile('doc_minor_parent_aadhaar'),
+            onRemove: () => setState(() => _uploadedDocs.remove('doc_minor_parent_aadhaar')),
+          ),
       ],
     );
   }

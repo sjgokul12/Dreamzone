@@ -411,15 +411,15 @@ class _AboutScreenState extends State<AboutScreen>
           const SizedBox(height: 14),
           _contactTile(Icons.location_on_outlined, 'Head Office', 'NO-79, 5TH CROSS, RAMESHNAGAR, OPP POST OFFICE, Bengaluru Urban, Karnataka 560037'),
           const SizedBox(height: 8),
-          _contactTile(Icons.phone_outlined, 'Helpline', '+91 9986074786'),
+          _contactTile(Icons.phone_outlined, 'Helpline', '+91 9880885551'),
           const SizedBox(height: 8),
-          _contactTile(Icons.email_outlined, 'Email Support', 'care@dreamzoneindia.in'),
+          _contactTile(Icons.email_outlined, 'Email Support', 'dreamzone.infinity@gmail.com'),
           const SizedBox(height: 18),
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchUrl('tel:+919986074786'),
+                  onPressed: () => _launchUrl('tel:+919880885551'),
                   icon: const Icon(Icons.call, size: 16),
                   label: const Text('Call Helpline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: ElevatedButton.styleFrom(
@@ -433,7 +433,7 @@ class _AboutScreenState extends State<AboutScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _launchUrl('mailto:care@dreamzoneindia.in'),
+                  onPressed: () => _launchUrl('mailto:dreamzone.infinity@gmail.com'),
                   icon: const Icon(Icons.email_outlined, size: 16),
                   label: const Text('Email Us', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   style: OutlinedButton.styleFrom(
@@ -666,5 +666,5 @@ We collect identity information and documents strictly necessary to process offi
 • Data is strictly handled in accordance with IT Act regulations
 
 3. Contact
-Email: care@dreamzoneindia.in | Phone: +91 9986074786
+Email: dreamzone.infinity@gmail.com | Phone: +91 9880885551
 ''';
