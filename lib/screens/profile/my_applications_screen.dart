@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/bbps_invoice_pdf_service.dart';
+import '../services/BBPS Services/bbps_receipt_screen.dart';
 import '../home/home_screen.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
@@ -402,85 +404,224 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
         final status = (item['status'] ?? 'submitted').toString();
         final color = _statusColor(status);
         final date = _timeAgo(item['created_at']?.toString());
-        final refId = item['application_no'] ?? item['id'] ?? 'DZI-${index + 100}';
+        final refId = item['application_no'] ?? item['tracking_id'] ?? item['id'] ?? 'DZI-${index + 100}';
+        final isUtility = item['is_utility'] == true;
+        final isBus = item['is_bus'] == true;
+        final iconStr = item['display_icon']?.toString() ?? '';
+        final IconData cardIcon = iconStr == 'bolt'
+            ? Icons.bolt_rounded
+            : iconStr == 'water_drop'
+                ? Icons.water_drop_rounded
+                : iconStr == 'phone_android'
+                    ? Icons.phone_android_rounded
+                    : iconStr == 'directions_bus'
+                        ? Icons.directions_bus_rounded
+                        : iconStr == 'tv'
+                            ? Icons.tv_rounded
+                            : iconStr == 'directions_car'
+                                ? Icons.directions_car_rounded
+                                : iconStr == 'wifi'
+                                    ? Icons.wifi_rounded
+                                    : iconStr == 'call'
+                                        ? Icons.call_rounded
+                                        : iconStr == 'local_fire_department'
+                                            ? Icons.local_fire_department_rounded
+                                            : Icons.description_outlined;
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardSurface,
+        final Color itemThemeColor = isUtility
+            ? (iconStr == 'bolt'
+                ? const Color(0xFFF59E0B)
+                : iconStr == 'water_drop'
+                    ? const Color(0xFF0284C7)
+                    : const Color(0xFF10B981))
+            : (isBus ? const Color(0xFFEC4899) : primaryTeal);
+
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(8),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: primaryTeal.withAlpha(18),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.description_outlined, color: primaryTeal, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          serviceName,
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textDarkHeading),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Ref: $refId',
-                          style: const TextStyle(fontSize: 11, color: textSubdued, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      _statusText(status),
-                      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
+            onTap: () {
+              if (isUtility) {
+                final receipt = BbpsReceiptModel(
+                  serviceCategory: (item['service_category'] ?? 'Utility Bill').toString(),
+                  operatorName: (item['operator_name'] ?? '').toString(),
+                  accountNumber: (item['account_number'] ?? '').toString(),
+                  customerName: (item['customer_name'] ?? 'Valued Customer').toString(),
+                  merchantTxnId: refId.toString(),
+                  dateTimeStr: (item['created_at'] ?? '').toString(),
+                  amount: (item['amount'] is num
+                      ? (item['amount'] as num).toDouble()
+                      : (double.tryParse(item['amount']?.toString() ?? '0') ?? 0.0)),
+                  status: (item['status'] ?? 'Success').toString(),
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                );
+              } else {
+                _showDetailsBottomSheet(item, serviceName, refId.toString(), status, date);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.withAlpha(20)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(8),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              if (date.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.access_time_rounded, size: 14, color: textSubdued),
-                    const SizedBox(width: 4),
-                    Text(date, style: const TextStyle(fontSize: 11, color: textSubdued)),
-                    const Spacer(),
-                    const Text('View Details', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primaryTeal)),
-                    const Icon(Icons.chevron_right, size: 16, color: primaryTeal),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: itemThemeColor.withAlpha(20),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(cardIcon, color: itemThemeColor, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              serviceName,
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: textDarkHeading),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isUtility && item['account_number'] != null && item['account_number'].toString().isNotEmpty
+                                  ? 'Acct: ${item['account_number']} • Ref: $refId'
+                                  : 'Ref: $refId',
+                              style: const TextStyle(fontSize: 11, color: textSubdued, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withAlpha(20),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _statusText(status),
+                          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (item['amount'] != null && (item['amount'] as num) > 0) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Amount Paid:', style: TextStyle(fontSize: 11.5, color: textSubdued, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 6),
+                        Text(
+                          '₹${(item['amount'] as num).toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ],
-            ],
+                  if (date.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_rounded, size: 14, color: textSubdued),
+                        const SizedBox(width: 4),
+                        Text(date, style: const TextStyle(fontSize: 11, color: textSubdued)),
+                        const Spacer(),
+                        Text(
+                          isUtility ? 'Receipt & Download' : 'View Details',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: itemThemeColor),
+                        ),
+                        Icon(Icons.chevron_right, size: 16, color: itemThemeColor),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+
+  void _showDetailsBottomSheet(Map<String, dynamic> item, String serviceName, String refId, String status, String date) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: Colors.white,
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(serviceName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textDarkHeading)),
+                ),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildDetailRow('Reference / ID', refId),
+            _buildDetailRow('Status', _statusText(status)),
+            if (item['account_number'] != null && item['account_number'].toString().isNotEmpty)
+              _buildDetailRow('Account / Number', item['account_number'].toString()),
+            if (item['amount'] != null && (item['amount'] as num) > 0)
+              _buildDetailRow('Amount', '₹${(item['amount'] as num).toStringAsFixed(2)}'),
+            if (date.isNotEmpty)
+              _buildDetailRow('Submitted', date),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryTeal,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 13, color: textSubdued, fontWeight: FontWeight.w600)),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDarkHeading)),
+        ],
+      ),
     );
   }
 
