@@ -69,39 +69,13 @@ class PrepaidApiService {
     };
   }
 
-  static String mapToPlanApiOpcode(String raw) {
-    final u = raw.toUpperCase().trim();
-    if (u.contains('JIO') || u == '116' || u == '11') return '11';
-    if (u.contains('AIRTEL') || u == '3' || u == '2') return '2';
-    if (u.contains('VI') || u.contains('VODAFONE') || u.contains('IDEA') || u == '37' || u == '23' || u == '6') return '23';
-    if (u.contains('BSNL') || u == '4' || u == '5') return '5';
-    return raw.isNotEmpty ? raw : '2';
-  }
-
-  static String mapToPlanApiCircle(String raw) {
-    final u = raw.toUpperCase().trim();
-    const map = {
-      'TAMIL NADU': '94', 'CHENNAI': '40', 'KARNATAKA': '06', 'KERALA': '95',
-      'ANDHRA PRADESH': '49', 'TELANGANA': '49', 'DELHI': '10', 'DELHI NCR': '10',
-      'MUMBAI': '92', 'MAHARASHTRA': '90', 'MAHARASHTRA & GOA': '90', 'MAHARASHTRA AND GOA': '90',
-      'GUJARAT': '98', 'RAJASTHAN': '70', 'WEST BENGAL': '51', 'KOLKATA': '31', 'KOLKATTA': '31',
-      'PUNJAB': '02', 'HARYANA': '96', 'UP EAST': '54', 'UP WEST': '97',
-      'UP(EAST)': '54', 'UP(WEST)': '97', 'UP WEST & UTTARAKHAND': '97',
-      'BIHAR & JHARKHAND': '52', 'BIHAR': '52', 'ODISHA': '53', 'ORISSA': '53',
-      'ASSAM': '56', 'NORTH EAST': '16', 'NESA': '16', 'HIMACHAL PRADESH': '03', 'HP': '03',
-      'JAMMU & KASHMIR': '55', 'J&K': '55', 'MADHYA PRADESH & CHHATTISGARH': '93',
-      'MADHYA PRADESH': '93', 'MP': '93', 'CHHATTISGARH': '101', 'GOA': '102',
-    };
-    return map[u] ?? (raw.isNotEmpty ? raw : '94');
-  }
-
   /// 2. Fetch R-OFFER (Live API from PlanAPI)
   static Future<List<Map<String, dynamic>>> fetchROffers({
     required String mobileNo,
     required String operatorCode,
   }) async {
     final cleanMobile = mobileNo.replaceAll('+91', '').replaceAll(' ', '').trim();
-    final opCode = mapToPlanApiOpcode(operatorCode);
+    final opCode = operatorCode.trim();
 
     // 1. Try Backend Proxy API
     try {
@@ -157,18 +131,20 @@ class PrepaidApiService {
   static Future<List<Map<String, dynamic>>> fetchMobilePlans({
     required String operatorCode,
     required String circleCode,
+    String? mobile,
   }) async {
-    final opCode = mapToPlanApiOpcode(operatorCode);
-    final cCode = mapToPlanApiCircle(circleCode);
+    final cleanMobile = (mobile ?? '').replaceAll('+91', '').replaceAll(' ', '').trim();
+    final opCode = operatorCode.trim();
+    final cCode = circleCode.trim();
 
     // 1. Try Backend API
     try {
       final res = await ApiService.fetchApi(
-        '/recharge/plans?operator_id=$opCode&circle=$cCode',
+        '/recharge/plans?operator_id=$opCode&circle=$cCode&mobile=$cleanMobile',
       );
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        if (data['success'] == true && data['plans'] is List) {
+        if (data['success'] == true && data['plans'] is List && (data['plans'] as List).isNotEmpty) {
           return (data['plans'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         }
       }

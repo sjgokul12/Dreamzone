@@ -373,13 +373,15 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
   Future<void> _showBrowsePlansSheet() async {
     setState(() => _loadingPlans = true);
 
-    final opCode = _selectedOperator ?? _detectedOpCode ?? '';
+    final cleanMobile = _mobileCtrl.text.replaceAll('+91', '').replaceAll(' ', '').trim();
+    final opCode = _detectedOpCode ?? _selectedOperator ?? '';
     final circleCode = _detectedCircleCode ?? _selectedCircle ?? '';
 
     try {
       final plans = await PrepaidApiService.fetchMobilePlans(
         operatorCode: opCode,
         circleCode: circleCode,
+        mobile: cleanMobile,
       );
       if (mounted) {
         setState(() {
