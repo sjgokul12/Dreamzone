@@ -11,6 +11,7 @@ import '../../../../services/bbps_invoice_pdf_service.dart';
 import '../../../../widgets/bbps_fetched_bill_card.dart';
 import '../../../../core/payment/razorpay_service.dart';
 import '../bbps_receipt_screen.dart';
+import '../../../home/home_screen.dart';
 
 typedef Landline = LandlineScreen;
 
@@ -1451,6 +1452,28 @@ class _LandlineScreenState extends State<LandlineScreen>
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const HomeScreen(initialIndex: 2),
+                    ),
+                    (route) => false,
+                  );
+                },
+                icon: const Icon(Icons.assignment_outlined, size: 18, color: primaryPurple),
+                label: const Text('View in My Orders / Requests', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: primaryPurple)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: primaryPurple),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
             ),
           ],
         ),

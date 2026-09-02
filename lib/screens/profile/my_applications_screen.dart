@@ -536,17 +536,27 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                       ),
                     ],
                   ),
-                  if (item['amount'] != null && (item['amount'] as num) > 0) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text('Amount Paid:', style: TextStyle(fontSize: 11.5, color: textSubdued, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 6),
-                        Text(
-                          '₹${(item['amount'] as num).toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading),
-                        ),
-                      ],
+                  if (item['amount'] != null) ...[
+                    Builder(
+                      builder: (_) {
+                        final num? amt = item['amount'] is num
+                            ? (item['amount'] as num)
+                            : num.tryParse(item['amount'].toString());
+                        if (amt == null || amt <= 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              const Text('Amount Paid:', style: TextStyle(fontSize: 11.5, color: textSubdued, fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 6),
+                              Text(
+                                '₹${amt.toStringAsFixed(2)}',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: textDarkHeading),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                   if (date.isNotEmpty) ...[

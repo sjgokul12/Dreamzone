@@ -10,6 +10,7 @@ import '../../../../services/prepaid_api_service.dart';
 import '../../../../core/payment/razorpay_service.dart';
 import '../bbps_receipt_screen.dart';
 import 'prepaid_recharge_screen.dart';
+import '../../../home/home_screen.dart';
 
 class PostpaidRechargeScreen extends StatefulWidget {
   const PostpaidRechargeScreen({super.key});
@@ -990,6 +991,28 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Pay Another Bill', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HomeScreen(initialIndex: 2),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.assignment_outlined, size: 18, color: primaryPurple),
+              label: const Text('View in My Orders / Requests', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: primaryPurple)),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: primaryPurple),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
             ),
           ),
         ],

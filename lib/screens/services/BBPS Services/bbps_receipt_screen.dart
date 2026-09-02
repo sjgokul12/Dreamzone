@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 import 'package:open_filex/open_filex.dart';
 import '../../../services/bbps_invoice_pdf_service.dart';
+import '../../home/home_screen.dart';
 
 class BbpsReceiptScreen extends StatefulWidget {
   final BbpsReceiptModel receipt;
@@ -374,53 +375,80 @@ class _BbpsReceiptScreenState extends State<BbpsReceiptScreen> with SingleTicker
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // WhatsApp Share
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _isSharing ? null : _handleWhatsAppShare,
-              icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
-              label: const Text('WhatsApp', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF25D366),
-                side: const BorderSide(color: Color(0xFF25D366)),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          Row(
+            children: [
+              // WhatsApp Share
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isSharing ? null : _handleWhatsAppShare,
+                  icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 18),
+                  label: const Text('WhatsApp', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF25D366),
+                    side: const BorderSide(color: Color(0xFF25D366)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
+              const SizedBox(width: 8),
 
-          // Email Share
-          Expanded(
+              // Email Share
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isSharing ? null : _handleEmailShare,
+                  icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
+                  label: const Text('Email', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: primaryPurple,
+                    side: const BorderSide(color: primaryPurple),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Download PDF Button
+              Expanded(
+                flex: 1,
+                child: ElevatedButton.icon(
+                  onPressed: _isSharing ? null : _handleDownloadPdf,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Download', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
             child: OutlinedButton.icon(
-              onPressed: _isSharing ? null : _handleEmailShare,
-              icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 18),
-              label: const Text('Email', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              onPressed: () {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const HomeScreen(initialIndex: 2),
+                  ),
+                  (route) => false,
+                );
+              },
+              icon: const Icon(Icons.assignment_outlined, size: 18, color: primaryPurple),
+              label: const Text('View in My Orders / Requests', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryPurple)),
               style: OutlinedButton.styleFrom(
-                foregroundColor: primaryPurple,
                 side: const BorderSide(color: primaryPurple),
-                padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Download PDF Button
-          Expanded(
-            flex: 1,
-            child: ElevatedButton.icon(
-              onPressed: _isSharing ? null : _handleDownloadPdf,
-              icon: const Icon(Icons.download_rounded, size: 18),
-              label: const Text('Download', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryPurple,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                elevation: 2,
               ),
             ),
           ),
