@@ -84,7 +84,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
           setState(() {
             _allApplications = all;
             _serviceApps = all
-                .where((a) => a['app_type'] == 'service')
+                .where((a) => a['app_type'] != 'career')
                 .toList();
             _careerApps = all.where((a) => a['app_type'] == 'career').toList();
             _loading = false;
@@ -330,9 +330,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
 }
 
   Widget _buildStatsBar() {
-    final pending = _allApplications.where((a) => a['status'] == 'pending').length;
-    final completed = _allApplications.where((a) => a['status'] == 'completed' || a['status'] == 'approved').length;
-    final rejected = _allApplications.where((a) => a['status'] == 'rejected').length;
+    final completed = _allApplications.where((a) {
+      final s = (a['status'] ?? '').toString().toLowerCase();
+      return s == 'completed' || s == 'approved' || s == 'selected' || s == 'success' || s == 'paid' || s == 'confirmed';
+    }).length;
+    final pending = _allApplications.where((a) {
+      final s = (a['status'] ?? '').toString().toLowerCase();
+      return s != 'completed' && s != 'approved' && s != 'selected' && s != 'success' && s != 'paid' && s != 'confirmed' && s != 'rejected' && s != 'failed';
+    }).length;
+    final rejected = _allApplications.where((a) {
+      final s = (a['status'] ?? '').toString().toLowerCase();
+      return s == 'rejected' || s == 'failed';
+    }).length;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),

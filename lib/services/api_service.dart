@@ -86,18 +86,10 @@ class ApiService {
     }
   }
 
-  // Helper with timeout
+  // Helper with 25s timeout and multi-backend fallback
   Future<Map<String, dynamic>> _get(String endpoint) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final headers = <String, String>{};
-    if (token != null) headers['Authorization'] = 'Bearer $token';
-
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: headers,
-      ).timeout(const Duration(seconds: 8));
+      final response = await fetchApi(endpoint, timeoutSeconds: 25);
       
       if (response.body.trim().isEmpty) {
         return {'success': false, 'message': 'Empty response from server (HTTP ${response.statusCode})'};
