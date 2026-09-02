@@ -7,7 +7,13 @@ import '../home/home_screen.dart';
 class OtpScreen extends StatefulWidget {
   final String email;
   final bool isRegistration;
-  const OtpScreen({super.key, required this.email, this.isRegistration = false});
+  final String? initialOtp;
+  const OtpScreen({
+    super.key,
+    required this.email,
+    this.isRegistration = false,
+    this.initialOtp,
+  });
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -25,6 +31,9 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialOtp != null && widget.initialOtp!.isNotEmpty) {
+      _otpController.text = widget.initialOtp!;
+    }
     _startTimer();
   }
 
@@ -102,7 +111,12 @@ class _OtpScreenState extends State<OtpScreen> {
       );
       
       if (result['success'] == true) {
-        _showSnack('A new OTP has been sent to your email.', isError: false);
+        if (result['otp'] != null && result['otp'].toString().isNotEmpty) {
+          _otpController.text = result['otp'].toString();
+          _showSnack('Your new verification code is: ${result['otp']}', isError: false);
+        } else {
+          _showSnack('A new OTP has been sent to your email.', isError: false);
+        }
         _startTimer();
       } else {
         _showSnack(result['message'] ?? 'Failed to resend OTP', isError: true);
@@ -222,7 +236,34 @@ class _OtpScreenState extends State<OtpScreen> {
                             color: primaryPurple,
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 16),
+                        if (widget.initialOtp != null && widget.initialOtp!.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withAlpha(20),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF10B981).withAlpha(80)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Your OTP: ${widget.initialOtp}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF065F46),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
 
                         // OTP Code Input Field
                         TextField(

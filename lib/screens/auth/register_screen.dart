@@ -88,9 +88,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        final initialOtp = result['otp']?.toString();
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => OtpScreen(email: email, isRegistration: true)),
+          MaterialPageRoute(
+            builder: (_) => OtpScreen(
+              email: email,
+              isRegistration: true,
+              initialOtp: initialOtp,
+            ),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
