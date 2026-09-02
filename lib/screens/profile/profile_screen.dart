@@ -986,19 +986,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatsRow() {
     final done = _allApplications
         .where(
-          (a) =>
-              a['status'] == 'completed' ||
-              a['status'] == 'approved' ||
-              a['status'] == 'selected',
+          (a) {
+            final s = (a['status'] ?? '').toString().toLowerCase();
+            return s == 'completed' || s == 'approved' || s == 'selected' || s == 'success' || s == 'paid' || s == 'confirmed';
+          },
         )
         .length;
     final active = _allApplications
         .where(
-          (a) =>
-              a['status'] != 'completed' &&
-              a['status'] != 'approved' &&
-              a['status'] != 'selected' &&
-              a['status'] != 'rejected',
+          (a) {
+            final s = (a['status'] ?? '').toString().toLowerCase();
+            return s != 'completed' && s != 'approved' && s != 'selected' && s != 'success' && s != 'paid' && s != 'confirmed' && s != 'rejected' && s != 'failed';
+          },
         )
         .length;
 

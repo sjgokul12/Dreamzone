@@ -9,6 +9,8 @@ import 'package:provider/provider.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/api_service.dart';
 import '../../../home/home_screen.dart';
+import '../../BBPS Services/bbps_receipt_screen.dart';
+import '../../../../services/bbps_invoice_pdf_service.dart';
 
 // ─── Premium Palette Theme Constants ─────────────────────────────────────────
 const Color primaryPurple = Color(0xFF5F33E1);
@@ -1526,7 +1528,134 @@ class PanSuccessView extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
+
+              // ── Auto-Sent Email & WhatsApp Confirmation ──
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECFDF5),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFA7F3D0)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.mark_email_read_rounded, color: Color(0xFF059669), size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Acknowledgement copy & bill has been automatically sent to your registered email & WhatsApp (+91 9880885551)',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // ── View & Download Acknowledgement / Bill Button ──
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    final now = DateTime.now();
+                    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                    final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+                    final receipt = BbpsReceiptModel(
+                      serviceCategory: 'Home Product / Government Service',
+                      operatorName: title,
+                      accountNumber: trackingId ?? 'TRK-APP',
+                      customerName: 'Applicant',
+                      merchantTxnId: trackingId ?? 'TRK-APP',
+                      dateTimeStr: dtStr,
+                      amount: 107.0,
+                      status: 'Submitted',
+                    );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => BbpsReceiptScreen(receipt: receipt)),
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long_rounded, size: 20),
+                  label: const Text(
+                    'View & Download Acknowledgement Bill',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // ── Share WhatsApp & Email Buttons ──
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final now = DateTime.now();
+                        final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                        final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+                        final receipt = BbpsReceiptModel(
+                          serviceCategory: 'Home Product / Government Service',
+                          operatorName: title,
+                          accountNumber: trackingId ?? 'TRK-APP',
+                          customerName: 'Applicant',
+                          merchantTxnId: trackingId ?? 'TRK-APP',
+                          dateTimeStr: dtStr,
+                          amount: 107.0,
+                          status: 'Submitted',
+                        );
+                        BbpsInvoicePdfService.shareToWhatsApp(receipt);
+                      },
+                      icon: const Icon(Icons.chat_rounded, color: Color(0xFF25D366), size: 17),
+                      label: const Text('WhatsApp', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF25D366),
+                        side: const BorderSide(color: Color(0xFF25D366)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final now = DateTime.now();
+                        final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                        final dtStr = '${now.day.toString().padLeft(2, '0')}-${months[now.month - 1]}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+                        final receipt = BbpsReceiptModel(
+                          serviceCategory: 'Home Product / Government Service',
+                          operatorName: title,
+                          accountNumber: trackingId ?? 'TRK-APP',
+                          customerName: 'Applicant',
+                          merchantTxnId: trackingId ?? 'TRK-APP',
+                          dateTimeStr: dtStr,
+                          amount: 107.0,
+                          status: 'Submitted',
+                        );
+                        BbpsInvoicePdfService.shareViaEmail(receipt);
+                      },
+                      icon: const Icon(Icons.email_outlined, color: primaryPurple, size: 17),
+                      label: const Text('Email', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: primaryPurple,
+                        side: const BorderSide(color: primaryPurple),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
               SizedBox(
                 width: double.infinity,
                 height: 48,

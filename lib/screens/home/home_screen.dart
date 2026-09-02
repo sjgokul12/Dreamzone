@@ -1092,7 +1092,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   key: ValueKey('applications_$_ordersRefreshKey'),
                   showBackButton: false,
                 ),
-                const ProfileScreen(showBackButton: false),
+                ProfileScreen(
+                  key: ValueKey('profile_$_ordersRefreshKey'),
+                  showBackButton: false,
+                ),
               ],
             ),
           ),
@@ -1100,7 +1103,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             selectedIndex: _selectedIndex,
             onTabSelected: (index) {
               setState(() {
-                if (index == 2) {
+                if (index == 2 || index == 3) {
                   _ordersRefreshKey++;
                 }
                 _selectedIndex = index;

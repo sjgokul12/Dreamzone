@@ -892,6 +892,30 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
           ),
           const SizedBox(height: 20),
 
+          // ── Auto-Sent Email & WhatsApp Confirmation ──
+          if (isSuccess || isPending)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFA7F3D0)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.mark_email_read_rounded, color: Color(0xFF059669), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bill receipt has been automatically sent to your registered email & WhatsApp (+91 9880885551)',
+                      style: TextStyle(fontSize: 11.5, color: Color(0xFF065F46), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           // ── Download / View Bill Receipt & Share Buttons ──
           if (isSuccess || isPending) ...[
             SizedBox(
