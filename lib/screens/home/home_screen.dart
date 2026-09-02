@@ -52,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ScrollController _homeScrollController = ScrollController();
   int _selectedIndex = 0;
+  int _ordersRefreshKey = 0;
   List<Map<String, dynamic>> _allServices = [];
   int _notificationCount = 0;
   final ApiService _api = ApiService();
@@ -1087,7 +1088,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   isGuest: isGuest,
                   showBackButton: false,
                 ),
-                const MyApplicationsScreen(showBackButton: false),
+                MyApplicationsScreen(
+                  key: ValueKey('applications_$_ordersRefreshKey'),
+                  showBackButton: false,
+                ),
                 const ProfileScreen(showBackButton: false),
               ],
             ),
@@ -1095,7 +1099,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           bottomNavigationBar: HomeBottomNavBar(
             selectedIndex: _selectedIndex,
             onTabSelected: (index) {
-              setState(() => _selectedIndex = index);
+              setState(() {
+                if (index == 2) {
+                  _ordersRefreshKey++;
+                }
+                _selectedIndex = index;
+              });
             },
           ),
         ),

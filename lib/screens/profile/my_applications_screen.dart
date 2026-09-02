@@ -165,9 +165,12 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
 
     return Scaffold(
       backgroundColor: bgCanvas,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
+      body: RefreshIndicator(
+        color: primaryTeal,
+        onRefresh: _loadApplications,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+          slivers: [
           // Top Curved Hero Container
           SliverToBoxAdapter(
             child: Container(
@@ -322,8 +325,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildStatsBar() {
     final pending = _allApplications.where((a) => a['status'] == 'pending').length;
@@ -664,6 +668,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen>
                 'Your submitted service requests will appear here',
                 style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 18),
+              ElevatedButton.icon(
+                onPressed: _loadApplications,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh Orders', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryTeal,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
               ),
             ],
           ),
