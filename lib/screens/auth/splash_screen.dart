@@ -121,28 +121,93 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0F172A),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Clean solid black backdrop
-          const ColoredBox(color: Colors.black),
+          // Instant branded placeholder layer (renders immediately at 0ms)
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF312E81)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(26),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withAlpha(100),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.all_inclusive_rounded,
+                        size: 50,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'DZI INFINITY',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Digital Services & Smart Payments',
+                    style: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-          // Welcome Video Player Layer (Plays full-screen)
+          // Welcome Video Player Layer (Cross-fades in the moment it is ready)
           if (_isVideoInitialized && _controller != null && _controller!.value.isInitialized)
-            SizedBox(
-              width: size.width,
-              height: size.height,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _controller!.value.size.width > 0
-                      ? _controller!.value.size.width
-                      : size.width,
-                  height: _controller!.value.size.height > 0
-                      ? _controller!.value.size.height
-                      : size.height,
-                  child: VideoPlayer(_controller!),
+            AnimatedOpacity(
+              opacity: _isVideoInitialized ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: _controller!.value.size.width > 0
+                        ? _controller!.value.size.width
+                        : size.width,
+                    height: _controller!.value.size.height > 0
+                        ? _controller!.value.size.height
+                        : size.height,
+                    child: VideoPlayer(_controller!),
+                  ),
                 ),
               ),
             ),

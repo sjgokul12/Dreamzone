@@ -11,17 +11,26 @@ class ApiService {
   /// On Mobile (APK / iOS), localhost:5000 is inaccessible (refers to phone itself).
   /// So Mobile immediately targets the cloud production backend.
   /// On Chrome Web, it tests localhost:5000 first, falling back to Render.
-  static List<String> get _baseUrls => kIsWeb
-      ? const [
-          'http://127.0.0.1:5000/api',
-          'http://localhost:5000/api',
-          'https://dzi-backend.onrender.com/api',
-        ]
-      : const [
-          'http://10.0.2.2:5000/api',
-          'http://192.168.1.13:5000/api',
-          'https://dzi-backend.onrender.com/api',
-        ];
+  static String? _workingBaseUrl;
+
+  /// On Mobile (APK / iOS), dzi-backend.onrender.com is the primary cloud endpoint.
+  /// Private IPs (10.0.2.2 / 192.168.1.13) fail on 4G/5G mobile networks and cause long hangs.
+  static List<String> get _baseUrls {
+    if (_workingBaseUrl != null) {
+      return [_workingBaseUrl!];
+    }
+    return kIsWeb
+        ? const [
+            'http://127.0.0.1:5000/api',
+            'http://localhost:5000/api',
+            'https://dzi-backend.onrender.com/api',
+          ]
+        : const [
+            'https://dzi-backend.onrender.com/api',
+            'http://10.0.2.2:5000/api',
+            'http://192.168.1.13:5000/api',
+          ];
+  }
 
   /// Centralized GET request that scans appropriate backends.
   static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 15}) async {
@@ -34,11 +43,12 @@ class ApiService {
 
     for (final base in _baseUrls) {
       try {
-        final timeout = base.contains('5000') ? 3 : timeoutSeconds;
+        final timeout = base.contains('5000') ? 2 : timeoutSeconds;
         final res = await http
             .get(Uri.parse('$base$path'), headers: headers)
             .timeout(Duration(seconds: timeout));
         if (res.statusCode != 404 && res.statusCode != 502) {
+          _workingBaseUrl = base; // Cache working URL!
           return res;
         }
       } catch (_) {
@@ -48,6 +58,7 @@ class ApiService {
 
     try {
       final res = await http.get(Uri.parse('$baseUrl$path'), headers: headers).timeout(Duration(seconds: timeoutSeconds));
+      _workingBaseUrl = baseUrl;
       return res;
     } catch (e) {
       throw Exception('Server unreachable: $e');
@@ -65,11 +76,12 @@ class ApiService {
 
     for (final base in _baseUrls) {
       try {
-        final timeout = base.contains('5000') ? 4 : timeoutSeconds;
+        final timeout = base.contains('5000') ? 2 : timeoutSeconds;
         final res = await http
             .post(Uri.parse('$base$path'), headers: headers, body: jsonEncode(body))
             .timeout(Duration(seconds: timeout));
         if (res.statusCode != 404 && res.statusCode != 502) {
+          _workingBaseUrl = base; // Cache working URL!
           return res;
         }
       } catch (_) {

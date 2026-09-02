@@ -39,8 +39,9 @@ class AuthProvider extends ChangeNotifier {
       try {
         _user = json.decode(userStr);
         _loggedIn = true;
-        await loadSettings();
         notifyListeners();
+        // Load settings asynchronously in background without delaying app launch
+        loadSettings();
       } catch (e) {
         debugPrint('Error parsing stored user: $e');
       }

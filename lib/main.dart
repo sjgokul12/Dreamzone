@@ -23,9 +23,11 @@ void main() async {
 
   final authProvider = AuthProvider();
   await authProvider.initAuth();
-  authProvider.loadServices();
 
   runApp(DZIApp(authProvider: authProvider));
+
+  // Background non-blocking load of service categories
+  authProvider.loadServices();
 }
 
 // FIX: class was named DZIInfinityApp — test/widget_test.dart referenced MyApp
