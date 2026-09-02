@@ -258,7 +258,7 @@ class BusInvoicePdfService {
                     ),
                     _buildMerchantRow('Retailer Name', 'SATISH K'),
                     _buildMerchantRow('Shop Name', 'DREAM ZONE CAFE'),
-                    _buildMerchantRow('Mobile', '9986682688'),
+                    _buildMerchantRow('Mobile / WhatsApp', '9880885551'),
                     _buildMerchantRow('Address', 'NO 79 5TH CROSS , BANGALORE , KARANATAKA - 560037', isLast: true),
                   ],
                 ),
@@ -590,6 +590,8 @@ class BusInvoicePdfService {
           '⏰ *Boarding Time:* ${invoice.boardingTime}\n'
           '🚏 *Boarding Point:* ${invoice.boardingPoint}\n'
           '💵 *Total Fare:* ₹${invoice.totalAmount.toStringAsFixed(2)}\n\n'
+          '👤 *Retailer:* SATISH K (DREAM ZONE CAFE)\n'
+          '📞 *Helpline / WhatsApp:* 9880885551\n\n'
           'Your tax invoice ticket is attached below. Have a pleasant and safe journey with DZI Infinity!';
 
       // Share file + text via system share (which can target WhatsApp directly)

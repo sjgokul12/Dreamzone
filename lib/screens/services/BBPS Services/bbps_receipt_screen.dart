@@ -199,6 +199,29 @@ class _BbpsReceiptScreenState extends State<BbpsReceiptScreen> with SingleTicker
               ],
             ),
           ),
+          const SizedBox(height: 14),
+
+          // ── Auto-Email Notification Banner ──
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.mark_email_read_rounded, color: Color(0xFF16A34A), size: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Bill receipt copy has been automatically emailed to your registered email from satishurs.urs@gmail.com',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF166534), fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
 
           // ── Receipt Data Card ──

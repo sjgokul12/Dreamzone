@@ -52,7 +52,7 @@ class BbpsInvoicePdfService {
   static const PdfColor successGreen = PdfColor.fromInt(0xFF16A34A);
 
   static const String defaultWhatsAppNumber = '9880885551';
-  static const String senderEmail = 'dreamzone.infinity@gmail.com';
+  static const String senderEmail = 'satishurs.urs@gmail.com';
 
   /// Retrieves logged-in user profile from SharedPreferences
   static Future<Map<String, String>> getLoggedInUserData() async {

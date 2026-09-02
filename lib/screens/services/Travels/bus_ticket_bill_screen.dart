@@ -237,6 +237,27 @@ class _BusTicketBillScreenState extends State<BusTicketBillScreen> with SingleTi
   Widget _buildPdfPreviewTab() {
     return Column(
       children: [
+        // Auto-sent Confirmation Banner
+        Container(
+          color: const Color(0xFFF0FDF4),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Confirmed ticket automatically sent to ${widget.invoice.customerEmail}',
+                  style: const TextStyle(fontSize: 11.5, color: Color(0xFF166534), fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFFDCFCE7)),
+
         // Quick Action Bar
         Container(
           color: Colors.white,
