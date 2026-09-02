@@ -1452,6 +1452,7 @@ class _LandlineScreenState extends State<LandlineScreen>
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
+            ),
             const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
@@ -1473,7 +1474,6 @@ class _LandlineScreenState extends State<LandlineScreen>
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
-            ),
             ),
           ],
         ),
