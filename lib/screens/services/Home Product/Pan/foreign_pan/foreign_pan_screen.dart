@@ -120,7 +120,6 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
           _titles = (dTitles['titles'] as List).map((e) => e.toString()).toList();
         }
       }
-      if (_titles.isEmpty) _titles = ["Shri", "Smt.", "Kumari", "M/s"];
       setState(() {});
     } catch (_) {}
   }
@@ -593,7 +592,7 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
         ),
         const SizedBox(height: 14),
 
-        buildPanInput('National Identification Number *', _identNoCtrl, placeholder: 'National Identification / Passport Number', prefixIcon: Icons.badge_outlined),
+        buildPanInput('Identification Number *', _identNoCtrl, placeholder: 'Identification / Passport Number', prefixIcon: Icons.badge_outlined),
       ],
     );
   }

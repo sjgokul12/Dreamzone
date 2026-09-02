@@ -198,12 +198,6 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
         }
       }
 
-      // Safe fallback if server is unreachable
-      if (_titles.isEmpty) _titles = ["Shri", "Smt.", "Kumari", "M/s"];
-      if (_categories.isEmpty) _categories = ["Individual", "Body of Individuals (BOI)", "Hindu undivided family (HUF)", "Company", "Partnership Firm", "Government", "Association of Persons (AOP)", "Trust (AOP)"];
-      if (_genders.isEmpty) _genders = ["Male", "Female", "Transgender"];
-      if (_states.isEmpty) _states = ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli", "Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Pondicherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"];
-
       setState(() {});
     } catch (_) {}
   }
@@ -290,40 +284,6 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
 
   double get _payableAmount => 150.00;
 
-  void _showMinorWarningDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.red.shade100, shape: BoxShape.circle),
-              child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text('Minor Applicant', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textDarkHeading)),
-          ],
-        ),
-        content: const Text(
-          'Minor !!! Please Upload Father/Mother Aadhaar.',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textLabelDark),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryPurple,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _pickFile(String docKey) async {
     try {
@@ -383,11 +343,16 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
       if (!_uploadedDocs.containsKey('doc_aadhaar') ||
           !_uploadedDocs.containsKey('doc_correction_front') ||
           !_uploadedDocs.containsKey('doc_correction_back') ||
-          !_uploadedDocs.containsKey('doc_dob_proof')) {
+          !_uploadedDocs.containsKey('doc_dob_proof') ||
+          (_isMinor && !_uploadedDocs.containsKey('doc_minor_parent_aadhaar'))) {
         setState(() => _expandedSectionIndex = 5);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('⚠️ Please upload Aadhaar, Correction Front & Back, and Proof of D.O.B'),
+            content: Text(
+              _isMinor
+                  ? '⚠️ Please upload Father/Mother Aadhaar Card for minor applicant'
+                  : '⚠️ Please upload Aadhaar, Correction Front & Back, and Proof of D.O.B',
+            ),
             backgroundColor: Colors.red.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -842,7 +807,6 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
                   int age = now.year - picked.year;
                   if (now.month < picked.month || (now.month == picked.month && now.day < picked.day)) age--;
                   setState(() => _isMinor = age < 18);
-                  if (_isMinor) _showMinorWarningDialog();
                 },
               ),
               buildPanDropdown('Gender *', _gender, _genders, (v) => setState(() => _gender = v), prefixIcon: Icons.wc_outlined),

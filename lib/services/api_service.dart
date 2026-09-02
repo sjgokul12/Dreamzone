@@ -19,6 +19,8 @@ class ApiService {
           'https://dzi-backend.onrender.com/api',
         ]
       : const [
+          'http://10.0.2.2:5000/api',
+          'http://192.168.1.13:5000/api',
           'https://dzi-backend.onrender.com/api',
         ];
 
@@ -33,9 +35,10 @@ class ApiService {
 
     for (final base in _baseUrls) {
       try {
+        final timeout = base.contains('5000') ? 3 : timeoutSeconds;
         final res = await http
             .get(Uri.parse('$base$path'), headers: headers)
-            .timeout(Duration(seconds: kIsWeb && base.contains('5000') ? 4 : timeoutSeconds));
+            .timeout(Duration(seconds: timeout));
         if (res.statusCode != 404 && res.statusCode != 502) {
           return res;
         }
@@ -63,9 +66,10 @@ class ApiService {
 
     for (final base in _baseUrls) {
       try {
+        final timeout = base.contains('5000') ? 4 : timeoutSeconds;
         final res = await http
             .post(Uri.parse('$base$path'), headers: headers, body: jsonEncode(body))
-            .timeout(Duration(seconds: kIsWeb && base.contains('5000') ? 4 : timeoutSeconds));
+            .timeout(Duration(seconds: timeout));
         if (res.statusCode != 404 && res.statusCode != 502) {
           return res;
         }

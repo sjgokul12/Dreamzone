@@ -11,13 +11,13 @@ import '../../../../services/api_service.dart';
 import '../../../home/home_screen.dart';
 
 // ─── Premium Palette Theme Constants ─────────────────────────────────────────
-const Color primaryPurple   = Color(0xFF5F33E1);
+const Color primaryPurple = Color(0xFF5F33E1);
 const Color secondaryPurple = Color(0xFF7C3AED);
 const Color textDarkHeading = Color(0xFF1E1B4B);
-const Color textLabelDark   = Color(0xFF312E81);
-const Color textSubdued     = Color(0xFF6B7280);
-const Color bgCanvas        = Color(0xFFF5F3FF);
-const Color cardSurface     = Colors.white;
+const Color textLabelDark = Color(0xFF312E81);
+const Color textSubdued = Color(0xFF6B7280);
+const Color bgCanvas = Color(0xFFF5F3FF);
+const Color cardSurface = Colors.white;
 
 // ─── Utility Helpers ─────────────────────────────────────────────────────────
 String formatBytes(int bytes) {
@@ -26,7 +26,10 @@ String formatBytes(int bytes) {
   return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
-Future<void> downloadAndOpenPanPdf(BuildContext context, String fileName) async {
+Future<void> downloadAndOpenPanPdf(
+  BuildContext context,
+  String fileName,
+) async {
   try {
     final assetPath = 'assets/$fileName.pdf';
     if (kIsWeb) {
@@ -93,22 +96,35 @@ class PanTopNavBar extends StatelessWidget {
                   ),
                 ],
               ),
-              child: const Icon(Icons.arrow_back, color: primaryPurple, size: 20),
+              child: const Icon(
+                Icons.arrow_back,
+                color: primaryPurple,
+                size: 20,
+              ),
             ),
           ),
           if (showPdfDropdown)
             PopupMenuButton<String>(
               icon: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: primaryPurple.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: primaryPurple.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: primaryPurple.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.picture_as_pdf_outlined, color: primaryPurple, size: 16),
+                    Icon(
+                      Icons.picture_as_pdf_outlined,
+                      color: primaryPurple,
+                      size: 16,
+                    ),
                     SizedBox(width: 6),
                     Text(
                       'Form PDFs',
@@ -127,31 +143,52 @@ class PanTopNavBar extends StatelessWidget {
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: '134_TAN_New_Govt',
-                  child: Text('1. 134_TAN_New_Govt', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '1. 134_TAN_New_Govt',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: '135_TAN_New_Non-Govt',
-                  child: Text('2. 135_TAN_New_Non-Govt', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '2. 135_TAN_New_Non-Govt',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'New PAN Application Individual Non-citizen Form 95',
-                  child: Text('3. New PAN Form 95 (Foreign)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '3. New PAN Form 95 (Foreign)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'New PAN Appliccation Firm,Trust, ect form',
-                  child: Text('4. New PAN Firm/Trust Form', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '4. New PAN Firm/Trust Form',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'New pan form',
-                  child: Text('5. New PAN Form', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '5. New PAN Form',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'PAN-Correction- Individual',
-                  child: Text('6. PAN Correction Individual', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '6. PAN Correction Individual',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
                 const PopupMenuItem(
                   value: 'PAN-Correction-Non-Individual',
-                  child: Text('7. PAN Correction Non-Individual', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '7. PAN Correction Non-Individual',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             )
@@ -217,7 +254,11 @@ class PanHeroCard extends StatelessWidget {
                 return Container(
                   color: const Color(0xFFF3F0FF),
                   child: const Center(
-                    child: Icon(Icons.credit_card_outlined, size: 70, color: primaryPurple),
+                    child: Icon(
+                      Icons.credit_card_outlined,
+                      size: 70,
+                      color: primaryPurple,
+                    ),
                   ),
                 );
               },
@@ -248,9 +289,19 @@ class PanCategoryTabs extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 16),
           child: Row(
             children: [
-              _buildTabCard(0, 'New PAN', 'Fresh card', Icons.add_card_outlined),
+              _buildTabCard(
+                0,
+                'New PAN',
+                'Fresh card',
+                Icons.add_card_outlined,
+              ),
               const SizedBox(width: 8),
-              _buildTabCard(1, 'Correction', 'Update PAN', Icons.edit_note_outlined),
+              _buildTabCard(
+                1,
+                'Correction',
+                'Update PAN',
+                Icons.edit_note_outlined,
+              ),
               const SizedBox(width: 8),
               _buildTabCard(2, 'Foreign', 'Non-citizen', Icons.public_outlined),
               const SizedBox(width: 8),
@@ -262,7 +313,12 @@ class PanCategoryTabs extends StatelessWidget {
     );
   }
 
-  Widget _buildTabCard(int index, String title, String subtitle, IconData icon) {
+  Widget _buildTabCard(
+    int index,
+    String title,
+    String subtitle,
+    IconData icon,
+  ) {
     final isSelected = selectedIndex == index;
     return Expanded(
       child: GestureDetector(
@@ -294,10 +350,16 @@ class PanCategoryTabs extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isSelected ? primaryPurple.withValues(alpha: 0.15) : const Color(0xFFF1F5F9),
+                  color: isSelected
+                      ? primaryPurple.withValues(alpha: 0.15)
+                      : const Color(0xFFF1F5F9),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, color: isSelected ? primaryPurple : textSubdued, size: 18),
+                child: Icon(
+                  icon,
+                  color: isSelected ? primaryPurple : textSubdued,
+                  size: 18,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -361,12 +423,16 @@ class PanAccordionSection extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isExpanded ? primaryPurple.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+          color: isExpanded
+              ? primaryPurple.withValues(alpha: 0.3)
+              : const Color(0xFFE2E8F0),
           width: isExpanded ? 1.5 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isExpanded ? primaryPurple.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.01),
+            color: isExpanded
+                ? primaryPurple.withValues(alpha: 0.04)
+                : Colors.black.withValues(alpha: 0.01),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -376,11 +442,16 @@ class PanAccordionSection extends StatelessWidget {
         children: [
           ListTile(
             onTap: () => onToggle(isExpanded ? -1 : index),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
             leading: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: isExpanded ? primaryPurple.withValues(alpha: 0.1) : const Color(0xFFF1F5F9),
+                color: isExpanded
+                    ? primaryPurple.withValues(alpha: 0.1)
+                    : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -391,23 +462,26 @@ class PanAccordionSection extends StatelessWidget {
             ),
             title: Text(
               title,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: textDarkHeading),
+              style: const TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.bold,
+                color: textDarkHeading,
+              ),
             ),
             subtitle: Text(
               subtitle,
               style: const TextStyle(fontSize: 11, color: textSubdued),
             ),
             trailing: Icon(
-              isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+              isExpanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
               color: textSubdued,
             ),
           ),
           if (isExpanded) ...[
             const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: child,
-            ),
+            Padding(padding: const EdgeInsets.all(16.0), child: child),
           ],
         ],
       ),
@@ -458,7 +532,10 @@ class PanStickyBottomBar extends StatelessWidget {
             onTap: onTap,
             borderRadius: BorderRadius.circular(22),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 12.0,
+              ),
               child: Row(
                 children: [
                   Container(
@@ -478,12 +555,19 @@ class PanStickyBottomBar extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 11),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -491,8 +575,15 @@ class PanStickyBottomBar extends StatelessWidget {
                   Container(
                     width: 40,
                     height: 40,
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                    child: const Icon(Icons.arrow_forward, color: primaryPurple, size: 18),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward,
+                      color: primaryPurple,
+                      size: 18,
+                    ),
                   ),
                 ],
               ),
@@ -523,8 +614,19 @@ Widget buildPanInput(
       Text.rich(
         TextSpan(
           text: cleanLabel,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
-          children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: textLabelDark,
+          ),
+          children: isReq
+              ? [
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                ]
+              : [],
         ),
       ),
       const SizedBox(height: 6),
@@ -532,24 +634,140 @@ Widget buildPanInput(
         controller: controller,
         readOnly: readOnly,
         keyboardType: isNum ? TextInputType.number : TextInputType.text,
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: readOnly ? textSubdued : textDarkHeading),
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: readOnly ? textSubdued : textDarkHeading,
+        ),
         decoration: InputDecoration(
           hintText: placeholder,
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: primaryPurple, size: 20)
+              : null,
           counterText: helper,
-          counterStyle: const TextStyle(fontSize: 10, color: primaryPurple, fontWeight: FontWeight.w600),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFFAFAFA),
+          counterStyle: const TextStyle(
+            fontSize: 10,
+            color: primaryPurple,
+            fontWeight: FontWeight.w600,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          fillColor: readOnly
+              ? const Color(0xFFF1F5F9)
+              : const Color(0xFFFAFAFA),
           filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: primaryPurple, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFEF4444)),
+          ),
         ),
-        validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+        validator: (v) =>
+            isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
       ),
     ],
+  );
+}
+
+void showPanMinorWarningDialog(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      contentPadding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red.shade700,
+              size: 26,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Minor Applicant',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                color: textDarkHeading,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Minor !!! Please Upload Father/Mother Aadhaar.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF991B1B),
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryPurple,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -558,6 +776,7 @@ Widget buildPanDateField(
   String label,
   TextEditingController controller, {
   ValueChanged<DateTime>? onDatePicked,
+  bool checkMinor = true,
 }) {
   final isReq = label.contains('*');
   final cleanLabel = label.replaceAll('*', '').trim();
@@ -568,8 +787,19 @@ Widget buildPanDateField(
       Text.rich(
         TextSpan(
           text: cleanLabel,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
-          children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: textLabelDark,
+          ),
+          children: isReq
+              ? [
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                ]
+              : [],
         ),
       ),
       const SizedBox(height: 6),
@@ -593,27 +823,66 @@ Widget buildPanDateField(
               );
             },
           );
+          if (!context.mounted) return;
           if (date != null) {
-            controller.text = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+            controller.text =
+                "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+
+            final isDobField = label.toLowerCase().contains('birth') || label.toLowerCase().contains('dob');
+            if (checkMinor && isDobField) {
+              final now = DateTime.now();
+              int age = now.year - date.year;
+              if (now.month < date.month || (now.month == date.month && now.day < date.day)) {
+                age--;
+              }
+              if (age < 18) {
+                showPanMinorWarningDialog(context);
+              }
+            }
+
             if (onDatePicked != null) onDatePicked(date);
           }
         },
         child: IgnorePointer(
           child: TextFormField(
             controller: controller,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: textDarkHeading,
+            ),
             decoration: InputDecoration(
               hintText: 'DD/MM/YYYY',
-              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-              suffixIcon: const Icon(Icons.calendar_month_outlined, size: 20, color: primaryPurple),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+              suffixIcon: const Icon(
+                Icons.calendar_month_outlined,
+                size: 20,
+                color: primaryPurple,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               fillColor: const Color(0xFFFAFAFA),
               filled: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: primaryPurple, width: 2),
+              ),
             ),
-            validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) =>
+                isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
           ),
         ),
       ),
@@ -638,27 +907,107 @@ Widget buildPanDropdown(
       Text.rich(
         TextSpan(
           text: cleanLabel,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
-          children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: textLabelDark,
+          ),
+          children: isReq
+              ? [
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                ]
+              : [],
         ),
       ),
       const SizedBox(height: 6),
       DropdownButtonFormField<String>(
+        key: ValueKey('${items.length}_$value'),
         initialValue: items.contains(value) ? value : null,
-        hint: hint != null ? Text(hint, style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8))) : null,
+        hint: items.isEmpty
+            ? Row(
+                children: const [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: primaryPurple,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Loading from database...',
+                    style: TextStyle(fontSize: 13, color: primaryPurple, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              )
+            : (hint != null
+                ? Text(
+                    hint,
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  )
+                : null),
         isExpanded: true,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+        menuMaxHeight: 350,
+        borderRadius: BorderRadius.circular(16),
+        dropdownColor: Colors.white,
+        icon: items.isEmpty
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: primaryPurple,
+                ),
+              )
+            : const Icon(Icons.arrow_drop_down_rounded, color: primaryPurple, size: 24),
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: textDarkHeading,
+        ),
         decoration: InputDecoration(
-          prefixIcon: prefixIcon != null ? Icon(prefixIcon, color: primaryPurple, size: 20) : null,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          prefixIcon: prefixIcon != null
+              ? Icon(prefixIcon, color: primaryPurple, size: 20)
+              : null,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
           fillColor: const Color(0xFFFAFAFA),
           filled: true,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: primaryPurple, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFEF4444)),
+          ),
         ),
-        items: items.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(color: textDarkHeading), overflow: TextOverflow.ellipsis))).toList(),
+        items: items
+            .map(
+              (t) => DropdownMenuItem<String>(
+                value: t,
+                child: Text(
+                  t,
+                  style: const TextStyle(color: textDarkHeading, fontWeight: FontWeight.w600, fontSize: 13.5),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            )
+            .toList(),
         onChanged: onChanged,
         validator: (v) => isReq && (v == null || v.isEmpty) ? 'Required' : null,
       ),
@@ -681,8 +1030,19 @@ Widget buildPanDualNameOnCardField(
       Text.rich(
         TextSpan(
           text: cleanLabel,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textLabelDark),
-          children: isReq ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: textLabelDark,
+          ),
+          children: isReq
+              ? [
+                  const TextSpan(
+                    text: ' *',
+                    style: TextStyle(color: Color(0xFFEF4444)),
+                  ),
+                ]
+              : [],
         ),
       ),
       const SizedBox(height: 6),
@@ -692,26 +1052,55 @@ Widget buildPanDualNameOnCardField(
           final inputWidget = TextFormField(
             controller: controller,
             textCapitalization: TextCapitalization.characters,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: textDarkHeading),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: textDarkHeading,
+            ),
             decoration: InputDecoration(
               hintText: placeholder,
-              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-              prefixIcon: const Icon(Icons.credit_card_outlined, color: primaryPurple, size: 20),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF94A3B8),
+              ),
+              prefixIcon: const Icon(
+                Icons.credit_card_outlined,
+                color: primaryPurple,
+                size: 20,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
               fillColor: const Color(0xFFFAFAFA),
               filled: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: primaryPurple, width: 2)),
-              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFEF4444))),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: primaryPurple, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: Color(0xFFEF4444)),
+              ),
             ),
-            validator: (v) => isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
+            validator: (v) =>
+                isReq && (v == null || v.trim().isEmpty) ? 'Required' : null,
           );
 
           final previewWidget = ValueListenableBuilder<TextEditingValue>(
             valueListenable: controller,
             builder: (context, val, _) {
-              final displayText = val.text.trim().isEmpty ? placeholder : val.text.toUpperCase();
+              final displayText = val.text.trim().isEmpty
+                  ? placeholder
+                  : val.text.toUpperCase();
               final isPlaceholder = val.text.trim().isEmpty;
               return Container(
                 height: 52,
@@ -724,7 +1113,13 @@ Widget buildPanDualNameOnCardField(
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.badge_outlined, color: isPlaceholder ? const Color(0xFF94A3B8) : primaryPurple, size: 18),
+                    Icon(
+                      Icons.badge_outlined,
+                      color: isPlaceholder
+                          ? const Color(0xFF94A3B8)
+                          : primaryPurple,
+                      size: 18,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -733,7 +1128,9 @@ Widget buildPanDualNameOnCardField(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
-                          color: isPlaceholder ? const Color(0xFF94A3B8) : const Color(0xFF334155),
+                          color: isPlaceholder
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF334155),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -781,7 +1178,7 @@ Widget buildPanDocUploadCard({
   final file = hasFile ? docs.first : null;
   final fileName = file != null ? (file['name'] ?? '') : '';
   final fileSize = file != null ? (file['size'] as int? ?? 0) : 0;
-  
+
   final isReq = title.contains('*');
   final cleanTitle = title.replaceAll('*', '').trim();
 
@@ -791,7 +1188,11 @@ Widget buildPanDocUploadCard({
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: hasFile ? primaryPurple.withValues(alpha: 0.5) : const Color(0xFFE2E8F0)),
+      border: Border.all(
+        color: hasFile
+            ? primaryPurple.withValues(alpha: 0.5)
+            : const Color(0xFFE2E8F0),
+      ),
       boxShadow: [
         BoxShadow(
           color: Colors.black.withValues(alpha: 0.02),
@@ -807,16 +1208,23 @@ Widget buildPanDocUploadCard({
           height: 46,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: docKey.contains('aadhaar') ? const [Color(0xFFEF4444), Color(0xFFDC2626)] :
-                      docKey.contains('front') ? const [Color(0xFF6366F1), Color(0xFF3B82F6)] :
-                      docKey.contains('back') ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)] :
-                      const [Color(0xFF10B981), Color(0xFF059669)],
+              colors: docKey.contains('aadhaar')
+                  ? const [Color(0xFFEF4444), Color(0xFFDC2626)]
+                  : docKey.contains('front')
+                  ? const [Color(0xFF6366F1), Color(0xFF3B82F6)]
+                  : docKey.contains('back')
+                  ? const [Color(0xFF8B5CF6), Color(0xFF7C3AED)]
+                  : const [Color(0xFF10B981), Color(0xFF059669)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.description_outlined, color: Colors.white, size: 24),
+          child: const Icon(
+            Icons.description_outlined,
+            color: Colors.white,
+            size: 24,
+          ),
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -826,16 +1234,33 @@ Widget buildPanDocUploadCard({
               Text.rich(
                 TextSpan(
                   text: hasFile ? fileName : cleanTitle,
-                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: textDarkHeading),
-                  children: (!hasFile && isReq) ? [const TextSpan(text: ' *', style: TextStyle(color: Color(0xFFEF4444)))] : [],
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: textDarkHeading,
+                  ),
+                  children: (!hasFile && isReq)
+                      ? [
+                          const TextSpan(
+                            text: ' *',
+                            style: TextStyle(color: Color(0xFFEF4444)),
+                          ),
+                        ]
+                      : [],
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Text(
-                hasFile ? 'Uploaded • ${formatBytes(fileSize)}' : 'PDF, PNG, JPG up to 2MB',
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: textSubdued),
+                hasFile
+                    ? 'Uploaded • ${formatBytes(fileSize)}'
+                    : 'PDF, PNG, JPG up to 2MB',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: textSubdued,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -846,21 +1271,30 @@ Widget buildPanDocUploadCard({
         if (hasFile)
           IconButton(
             onPressed: onRemove,
-            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFF94A3B8), size: 24),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Color(0xFF94A3B8),
+              size: 24,
+            ),
             tooltip: 'Remove file',
           )
         else
           ElevatedButton.icon(
             onPressed: onPick,
             icon: const Icon(Icons.upload_rounded, size: 16),
-            label: const Text('Upload', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            label: const Text(
+              'Upload',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryPurple.withValues(alpha: 0.1),
               foregroundColor: primaryPurple,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
               minimumSize: const Size(0, 36),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
       ],
@@ -869,7 +1303,11 @@ Widget buildPanDocUploadCard({
 }
 
 // ─── Responsive Row Helpers ──────────────────────────────────────────────────
-Widget buildPanResponsiveRow(BuildContext context, Widget child1, Widget child2) {
+Widget buildPanResponsiveRow(
+  BuildContext context,
+  Widget child1,
+  Widget child2,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       bool isWide = constraints.maxWidth > 650;
@@ -884,17 +1322,18 @@ Widget buildPanResponsiveRow(BuildContext context, Widget child1, Widget child2)
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                child1,
-                const SizedBox(height: 14),
-                child2,
-              ],
+              children: [child1, const SizedBox(height: 14), child2],
             );
     },
   );
 }
 
-Widget buildPanThreeColumnRow(BuildContext context, Widget c1, Widget c2, Widget c3) {
+Widget buildPanThreeColumnRow(
+  BuildContext context,
+  Widget c1,
+  Widget c2,
+  Widget c3,
+) {
   return LayoutBuilder(
     builder: (context, constraints) {
       bool isWide = constraints.maxWidth > 750;
@@ -943,16 +1382,30 @@ Widget buildPanPaymentStepBox({
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDarkHeading)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: textDarkHeading,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(fontSize: 11, color: textSubdued)),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 11, color: textSubdued),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '₹${amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: primaryPurple),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: primaryPurple,
+              ),
             ),
           ],
         ),
@@ -965,7 +1418,11 @@ Widget buildPanPaymentStepBox({
           Expanded(
             child: Text(
               'Payments are secure and encrypted.',
-              style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1012,13 +1469,20 @@ class PanSuccessView extends StatelessWidget {
               Container(
                 width: 72,
                 height: 72,
-                decoration: const BoxDecoration(color: primaryPurple, shape: BoxShape.circle),
+                decoration: const BoxDecoration(
+                  color: primaryPurple,
+                  shape: BoxShape.circle,
+                ),
                 child: const Icon(Icons.check, color: Colors.white, size: 42),
               ),
               const SizedBox(height: 20),
               const Text(
                 'Application Submitted!',
-                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: textDarkHeading),
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: textDarkHeading,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -1028,19 +1492,36 @@ class PanSuccessView extends StatelessWidget {
               ),
               const SizedBox(height: 18),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF5F3FF),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: primaryPurple.withValues(alpha: 0.1)),
+                  border: Border.all(
+                    color: primaryPurple.withValues(alpha: 0.1),
+                  ),
                 ),
                 child: Column(
                   children: [
-                    const Text('Tracking Reference ID', style: TextStyle(fontSize: 11, color: textSubdued, fontWeight: FontWeight.w500)),
+                    const Text(
+                      'Tracking Reference ID',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: textSubdued,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       trackingId ?? '',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: primaryPurple, letterSpacing: 0.5),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: primaryPurple,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ],
                 ),
@@ -1060,12 +1541,17 @@ class PanSuccessView extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.assignment_outlined, size: 20),
-                  label: const Text('View My Orders / Requests', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  label: const Text(
+                    'View My Orders / Requests',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryPurple,
                     foregroundColor: Colors.white,
                     elevation: 3,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -1075,11 +1561,27 @@ class PanSuccessView extends StatelessWidget {
                 height: 46,
                 child: OutlinedButton.icon(
                   onPressed: onBack,
-                  icon: const Icon(Icons.home_outlined, size: 18, color: primaryPurple),
-                  label: const Text('Back to Home', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: primaryPurple)),
+                  icon: const Icon(
+                    Icons.home_outlined,
+                    size: 18,
+                    color: primaryPurple,
+                  ),
+                  label: const Text(
+                    'Back to Home',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                      color: primaryPurple,
+                    ),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: primaryPurple.withValues(alpha: 0.3), width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    side: BorderSide(
+                      color: primaryPurple.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -1101,7 +1603,7 @@ class PanLoginModal extends StatefulWidget {
 }
 
 class _PanLoginModalState extends State<PanLoginModal> {
-  final _idController   = TextEditingController();
+  final _idController = TextEditingController();
   final _passController = TextEditingController();
   final ApiService _api = ApiService();
   bool _loading = false;
@@ -1133,16 +1635,28 @@ class _PanLoginModalState extends State<PanLoginModal> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Login Required', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: textDarkHeading)),
+              const Text(
+                'Login Required',
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: textDarkHeading,
+                ),
+              ),
               const SizedBox(height: 4),
-              const Text('Please login to submit your PAN application.', style: TextStyle(color: textSubdued, fontSize: 12.5)),
+              const Text(
+                'Please login to submit your PAN application.',
+                style: TextStyle(color: textSubdued, fontSize: 12.5),
+              ),
               const SizedBox(height: 16),
               TextField(
                 controller: _idController,
                 decoration: const InputDecoration(
                   labelText: 'Mobile or Email',
                   labelStyle: TextStyle(color: textSubdued, fontSize: 13),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryPurple, width: 2)),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: primaryPurple, width: 2),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1152,7 +1666,9 @@ class _PanLoginModalState extends State<PanLoginModal> {
                 decoration: const InputDecoration(
                   labelText: 'Password',
                   labelStyle: TextStyle(color: textSubdued, fontSize: 13),
-                  focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: primaryPurple, width: 2)),
+                  focusedBorder: UnderlineInputBorder(
+                    borderSide: BorderSide(color: primaryPurple, width: 2),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -1164,11 +1680,26 @@ class _PanLoginModalState extends State<PanLoginModal> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryPurple,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: _loading
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Login & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Login & Continue',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -1180,7 +1711,10 @@ class _PanLoginModalState extends State<PanLoginModal> {
 
   Future<void> _handleLogin() async {
     setState(() => _loading = true);
-    final res = await _api.login(_idController.text.trim(), _passController.text.trim());
+    final res = await _api.login(
+      _idController.text.trim(),
+      _passController.text.trim(),
+    );
     if (mounted) {
       setState(() => _loading = false);
       if (res['success'] == true) {

@@ -696,28 +696,33 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withAlpha(120),
       builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
         return Container(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+            constraints: BoxConstraints(
+              maxWidth: 440,
+              maxHeight: screenHeight * 0.85,
+            ),
             decoration: const BoxDecoration(
               color: Color(0xFFFAFAFF),
               borderRadius: BorderRadius.only(topLeft: Radius.circular(32), topRight: Radius.circular(32)),
               boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 40, offset: Offset(0, -10))],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(2),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
                 Align(
                   alignment: Alignment.topRight,
                   child: GestureDetector(
@@ -842,10 +847,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   void _showSectionPopup(Map<String, dynamic> service, List<dynamic> sections) {
     final serviceName = (service['name'] ?? '').toString().toLowerCase();
