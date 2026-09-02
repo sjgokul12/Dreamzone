@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,14 +9,21 @@ class ApiService {
   static const String localBaseUrl = 'http://127.0.0.1:5000/api';
   static const String adminBaseUrl = 'https://dzi-backend.onrender.com/api/admin';
 
-  static const List<String> _baseUrls = [
-    'http://127.0.0.1:5000/api',
-    'http://localhost:5000/api',
-    'https://dzi-backend.onrender.com/api',
-  ];
+  /// On Mobile (APK / iOS), localhost:5000 is inaccessible (refers to phone itself).
+  /// So Mobile immediately targets the cloud production backend.
+  /// On Chrome Web, it tests localhost:5000 first, falling back to Render.
+  static List<String> get _baseUrls => kIsWeb
+      ? const [
+          'http://127.0.0.1:5000/api',
+          'http://localhost:5000/api',
+          'https://dzi-backend.onrender.com/api',
+        ]
+      : const [
+          'https://dzi-backend.onrender.com/api',
+        ];
 
-  /// Centralized GET request that scans local backend first, falling back to Render.
-  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 25}) async {
+  /// Centralized GET request that scans appropriate backends.
+  static Future<http.Response> fetchApi(String path, {int timeoutSeconds = 15}) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
     final headers = <String, String>{};
@@ -27,7 +35,7 @@ class ApiService {
       try {
         final res = await http
             .get(Uri.parse('$base$path'), headers: headers)
-            .timeout(Duration(seconds: timeoutSeconds));
+            .timeout(Duration(seconds: kIsWeb && base.contains('5000') ? 4 : timeoutSeconds));
         if (res.statusCode != 404 && res.statusCode != 502) {
           return res;
         }
@@ -57,7 +65,7 @@ class ApiService {
       try {
         final res = await http
             .post(Uri.parse('$base$path'), headers: headers, body: jsonEncode(body))
-            .timeout(Duration(seconds: timeoutSeconds));
+            .timeout(Duration(seconds: kIsWeb && base.contains('5000') ? 4 : timeoutSeconds));
         if (res.statusCode != 404 && res.statusCode != 502) {
           return res;
         }
