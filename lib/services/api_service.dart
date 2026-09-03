@@ -539,59 +539,51 @@ class ApiService {
     }
   }
 
-  /// Standard PAN Database Masters (Matches MySQL seeded tables)
-  static const List<String> defaultTitles = ['Shri', 'Smt.', 'Kumari', 'M/s'];
-  static const List<String> defaultCategories = [
-    'Individual',
-    'Body of Individuals (BOI)',
-    'Partnership Firm',
-    'Government',
-    'Association of Persons (AOP)',
-    'Trust (AOP)',
-    'Hindu undivided family (HUF)',
-    'Company'
-  ];
-  static const List<String> defaultGenders = ['Male', 'Female', 'Transgender'];
-  static const List<String> defaultStates = [
-    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam',
-    'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli', 'Daman and Diu', 'Delhi',
-    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand',
-    'Karnataka', 'Kenmore', 'Kerala', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra',
-    'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Narora', 'Natwar', 'Odisha',
-    'Paschim Medinipur', 'Pondicherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
-    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'Vaishali', 'West Bengal'
-  ];
+  /// In-memory cache of PAN Master lists from Database
+  static Map<String, dynamic>? _cachedPanMasters;
 
-  /// Dynamic PAN Masters cache from Database
-  static Map<String, dynamic>? _cachedPanMasters = {
-    'success': true,
-    'titles': defaultTitles,
-    'categories': defaultCategories,
-    'genders': defaultGenders,
-    'states': defaultStates,
-  };
-
-  /// Fetches PAN Master lists (Titles, Categories, Genders, States) from Database.
+  /// Fetches PAN Master lists (Titles, Categories, Genders, States) 100% dynamically from MySQL Database.
   static Future<Map<String, dynamic>> getPanMasters() async {
-    // 1. Try unified masters route
+    // 1. Return in-memory database cache if already loaded
+    if (_cachedPanMasters != null && _cachedPanMasters!['success'] == true) {
+      return _cachedPanMasters!;
+    }
+
+    // 2. Load persistent database cache from SharedPreferences (0ms on mobile launch)
     try {
-      final res = await fetchApi('/pan/masters', timeoutSeconds: 4);
+      final prefs = await SharedPreferences.getInstance();
+      final savedJson = prefs.getString('cached_pan_database_masters');
+      if (savedJson != null && savedJson.isNotEmpty) {
+        final d = jsonDecode(savedJson);
+        if (d is Map<String, dynamic> && d['success'] == true) {
+          _cachedPanMasters = d;
+        }
+      }
+    } catch (_) {}
+
+    // 3. Fetch live from Database (/api/pan/masters)
+    try {
+      final res = await fetchApi('/pan/masters', timeoutSeconds: 6);
       if (res.statusCode == 200) {
         final d = jsonDecode(res.body);
         if (d['success'] == true) {
           _cachedPanMasters = Map<String, dynamic>.from(d);
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            prefs.setString('cached_pan_database_masters', res.body);
+          } catch (_) {}
           return _cachedPanMasters!;
         }
       }
     } catch (_) {}
 
-    // 2. Try individual routes
+    // 4. Try individual routes if /pan/masters failed
     try {
       final results = await Future.wait([
-        fetchApi('/pan/titles', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/categories', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/genders', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/states', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/titles', timeoutSeconds: 5).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/categories', timeoutSeconds: 5).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/genders', timeoutSeconds: 5).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/states', timeoutSeconds: 5).catchError((_) => http.Response('{}', 500)),
       ]);
 
       final titles = <String>[];
@@ -624,23 +616,27 @@ class ApiService {
         }
       }
 
-      if (titles.isNotEmpty && categories.isNotEmpty) {
+      if (titles.isNotEmpty || categories.isNotEmpty) {
         _cachedPanMasters = {
           'success': true,
           'titles': titles,
           'categories': categories,
-          'genders': genders.isNotEmpty ? genders : defaultGenders,
-          'states': states.isNotEmpty ? states : defaultStates,
+          'genders': genders,
+          'states': states,
         };
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          prefs.setString('cached_pan_database_masters', jsonEncode(_cachedPanMasters));
+        } catch (_) {}
       }
     } catch (_) {}
 
     return _cachedPanMasters ?? {
-      'success': true,
-      'titles': defaultTitles,
-      'categories': defaultCategories,
-      'genders': defaultGenders,
-      'states': defaultStates,
+      'success': false,
+      'titles': <String>[],
+      'categories': <String>[],
+      'genders': <String>[],
+      'states': <String>[],
     };
   }
 }

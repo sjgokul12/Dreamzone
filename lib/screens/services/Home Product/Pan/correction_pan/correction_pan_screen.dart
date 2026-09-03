@@ -38,11 +38,11 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
   bool _motherHasContent = false;
   bool _isMinor = false;
 
-  // Dynamic Masters loaded from Database with instant default fallback
-  List<String> _titles     = List<String>.from(ApiService.defaultTitles);
-  List<String> _categories = List<String>.from(ApiService.defaultCategories);
-  List<String> _genders    = List<String>.from(ApiService.defaultGenders);
-  List<String> _states     = List<String>.from(ApiService.defaultStates);
+  // 100% Dynamic Masters loaded purely from Database
+  List<String> _titles     = [];
+  List<String> _categories = [];
+  List<String> _genders    = [];
+  List<String> _states     = [];
 
   String? _applicantTitle;
   String? _applicantCategory;
