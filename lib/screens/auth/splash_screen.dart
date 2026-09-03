@@ -79,6 +79,10 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
     if (_hasNavigated || !mounted) return;
     _hasNavigated = true;
     _fallbackTimer?.cancel();
+    try {
+      _controller?.pause();
+      _controller?.removeListener(_checkVideoProgress);
+    } catch (_) {}
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final bool isGuest = !auth.isLoggedIn;
@@ -90,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
         transitionsBuilder: (_, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
-        transitionDuration: const Duration(milliseconds: 350),
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }
