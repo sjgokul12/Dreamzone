@@ -74,12 +74,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   List<Map<String, dynamic>> get _homeServices {
     final defaultOrder = [
-      {'id': 'pan', 'name': 'PAN', 'category': 'Home Product', 'icon': 'description', 'color': '#2563EB', 'asset_image': 'assets/PAN.png'},
-      {'id': 'gst', 'name': 'GST', 'category': 'Home Product', 'icon': 'receipt_long', 'color': '#059669', 'asset_image': 'assets/GST.png'},
-      {'id': 'msme', 'name': 'MSME', 'category': 'Home Product', 'icon': 'business', 'color': '#8B5CF6', 'asset_image': 'assets/MSME.png'},
       {'id': 'aadhaar', 'name': 'Aadhaar', 'category': 'Home Product', 'icon': 'fingerprint', 'color': '#D97706', 'asset_image': 'assets/Aadhaar.png'},
       {'id': 'travel_bus', 'name': 'Bus Booking', 'category': 'Travels', 'icon': 'directions_bus', 'color': '#EC4899', 'asset_image': 'assets/Bus booking.png'},
       {'id': 'recharge', 'name': 'Mobile Recharge', 'category': 'BBPS Services', 'asset_image': 'assets/Postpaid Mobile Recharges.png', 'icon': 'phone_android', 'color': '#059669'},
+      {'id': 'pan', 'name': 'PAN', 'category': 'Home Product', 'icon': 'description', 'color': '#2563EB', 'asset_image': 'assets/PAN.png'},
+      {'id': 'gst', 'name': 'GST', 'category': 'Home Product', 'icon': 'receipt_long', 'color': '#059669', 'asset_image': 'assets/GST.png'},
+      {'id': 'msme', 'name': 'MSME', 'category': 'Home Product', 'icon': 'business', 'color': '#8B5CF6', 'asset_image': 'assets/MSME.png'},
+      
     ];
 
     final result = <Map<String, dynamic>>[];
@@ -121,10 +122,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (_) {}
   }
 
+  void _initInitialServices() {
+    _ensureServiceExists('aadhaar', 'Aadhaar', 'Home Product', 'assets/Aadhaar.png', 'fingerprint', '#D97706');
+    _ensureServiceExists('travel_bus', 'Bus Booking', 'Travels', 'assets/Bus booking.png', 'directions_bus', '#EC4899');
+    _ensureServiceExists('recharge', 'Mobile Recharge', 'BBPS Services', 'assets/Postpaid Mobile Recharges.png', 'phone_android', '#059669');
+    _ensureServiceExists('pan', 'PAN', 'Home Product', 'assets/PAN.png', 'description', '#2563EB');
+    _ensureServiceExists('gst', 'GST', 'Home Product', 'assets/GST.png', 'receipt_long', '#059669');
+    _ensureServiceExists('msme', 'MSME', 'Home Product', 'assets/MSME.png', 'business', '#8B5CF6');
+    _ensureServiceExists('landline_bbps', 'Landline', 'BBPS Services', 'assets/Landline.png', 'phone_in_talk', '#2563EB');
+    _ensureServiceExists('dth_bbps', 'DTH Recharge', 'BBPS Services', 'assets/DTH.png', 'tv', '#6D28D9');
+    _ensureServiceExists('electricity_bbps', 'Electricity Bill', 'BBPS Services', 'assets/Electricity.png', 'bolt', '#0284C7');
+    _ensureServiceExists('piped_gas_bbps', 'Piped Gas Bill', 'BBPS Services', 'assets/Piped Gas Bill.jpg', 'propane_tank', '#0EA5E9');
+    _ensureServiceExists('gas_cylinder_bbps', 'Gas Cylinder', 'BBPS Services', 'assets/GAS.png', 'propane_tank', '#E11D48');
+    _ensureServiceExists('housing_society_bbps', 'Housing Society', 'BBPS Services', 'assets/Housing Society.png', 'home_work', '#5A80F6');
+    _ensureServiceExists('fastag_bbps', 'FASTag', 'BBPS Services', 'assets/Fastag.png', 'directions_car', '#FF2D6C');
+    _ensureServiceExists('metro_card_bbps', 'Metro Card Recharge', 'BBPS Services', 'assets/Metro card Recharge.png', 'subway', '#FF7D54');
+    _ensureServiceExists('broadband_bbps', 'Broadband Bill', 'BBPS Services', 'assets/Broadband.png', 'router', '#6366F1');
+    _ensureServiceExists('insurance_bbps', 'Insurance Premium', 'BBPS Services', 'assets/Insurance premium.png', 'health_and_safety', '#A855F7');
+    _ensureServiceExists('money_transfer_payment', 'Money Transfer', 'Payment Services', 'assets/Money Transfer.png', 'swap_horiz', '#00A896');
+  }
+
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    _initInitialServices();
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 2000),

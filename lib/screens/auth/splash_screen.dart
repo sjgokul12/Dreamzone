@@ -121,102 +121,76 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _precacheHomeAssets();
+  }
+
+  void _precacheHomeAssets() {
+    try {
+      const assets = [
+        'assets/Backgrounddzi.png',
+        'assets/BackgrounddziA.png',
+        'assets/Aadhaar.png',
+        'assets/Bus booking.png',
+        'assets/Postpaid Mobile Recharges.png',
+        'assets/PAN.png',
+        'assets/GST.png',
+        'assets/MSME.png',
+        'assets/Loginscreen.png',
+        'assets/Round.png',
+        'assets/Star.png',
+        'assets/Voter.png',
+        'assets/Fastag.png',
+        'assets/Landline.png',
+        'assets/DTH.png',
+        'assets/Electricity.png',
+        'assets/GAS.png',
+        'assets/Broadband.png',
+        'assets/Insurance premium.png',
+        'assets/Loan Payment.png',
+        'assets/Money Transfer.png',
+      ];
+      for (final a in assets) {
+        precacheImage(AssetImage(a), context).catchError((_) {});
+      }
+      Provider.of<AuthProvider>(context, listen: false).loadServices();
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Colors.black,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Instant branded placeholder layer (renders immediately at 0ms)
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF312E81)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFFEC4899)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF6366F1).withAlpha(100),
-                          blurRadius: 30,
-                          offset: const Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.all_inclusive_rounded,
-                        size: 50,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'DZI INFINITY',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Digital Services & Smart Payments',
-                    style: TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Clean solid black background
+          const ColoredBox(color: Colors.black),
 
-          // Welcome Video Player Layer (Cross-fades in the moment it is ready)
+          // Welcome Video Player Layer (Plays full-screen directly)
           if (_isVideoInitialized && _controller != null && _controller!.value.isInitialized)
-            AnimatedOpacity(
-              opacity: _isVideoInitialized ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 250),
-              child: SizedBox(
-                width: size.width,
-                height: size.height,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: _controller!.value.size.width > 0
-                        ? _controller!.value.size.width
-                        : size.width,
-                    height: _controller!.value.size.height > 0
-                        ? _controller!.value.size.height
-                        : size.height,
-                    child: VideoPlayer(_controller!),
-                  ),
+            SizedBox(
+              width: size.width,
+              height: size.height,
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller!.value.size.width > 0
+                      ? _controller!.value.size.width
+                      : size.width,
+                  height: _controller!.value.size.height > 0
+                      ? _controller!.value.size.height
+                      : size.height,
+                  child: VideoPlayer(_controller!),
                 ),
               ),
             ),
         ],
       ),
     );
+  }
   }
 }
