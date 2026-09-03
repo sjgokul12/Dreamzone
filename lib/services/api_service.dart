@@ -538,5 +538,72 @@ class ApiService {
       return {'success': false, 'message': 'Payment verification error: $e'};
     }
   }
+
+  /// Dynamic PAN Masters cache from Database
+  static Map<String, dynamic>? _cachedPanMasters;
+
+  /// Fetches PAN Master lists (Titles, Categories, Genders, States) from Database.
+  static Future<Map<String, dynamic>> getPanMasters() async {
+    if (_cachedPanMasters != null && _cachedPanMasters!['success'] == true) {
+      return _cachedPanMasters!;
+    }
+
+    try {
+      final res = await fetchApi('/pan/masters', timeoutSeconds: 5);
+      if (res.statusCode == 200) {
+        final d = jsonDecode(res.body);
+        if (d['success'] == true) {
+          _cachedPanMasters = Map<String, dynamic>.from(d);
+          return _cachedPanMasters!;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback to individual routes
+    try {
+      final results = await Future.wait([
+        fetchApi('/pan/titles', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/categories', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/genders', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/states', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
+      ]);
+
+      final titles = <String>[];
+      final categories = <String>[];
+      final genders = <String>[];
+      final states = <String>[];
+
+      if (results[0].statusCode == 200) {
+        final d = jsonDecode(results[0].body);
+        if (d['titles'] is List) titles.addAll((d['titles'] as List).map((e) => e.toString()));
+      }
+      if (results[1].statusCode == 200) {
+        final d = jsonDecode(results[1].body);
+        if (d['categories'] is List) categories.addAll((d['categories'] as List).map((e) => e.toString()));
+      }
+      if (results[2].statusCode == 200) {
+        final d = jsonDecode(results[2].body);
+        if (d['genders'] is List) genders.addAll((d['genders'] as List).map((e) => e.toString()));
+      }
+      if (results[3].statusCode == 200) {
+        final d = jsonDecode(results[3].body);
+        if (d['states'] is List) states.addAll((d['states'] as List).map((e) => e.toString()));
+      }
+
+      final combined = {
+        'success': true,
+        'titles': titles,
+        'categories': categories,
+        'genders': genders,
+        'states': states,
+      };
+      if (titles.isNotEmpty || categories.isNotEmpty) {
+        _cachedPanMasters = combined;
+      }
+      return combined;
+    } catch (_) {
+      return {'success': false, 'titles': <String>[], 'categories': <String>[], 'genders': <String>[], 'states': <String>[]};
+    }
+  }
 }
 

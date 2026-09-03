@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import '../home/home_screen.dart';
 
 /// Full-screen responsive video Splash Screen.
@@ -155,6 +156,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
         precacheImage(AssetImage(a), context).catchError((_) {});
       }
       Provider.of<AuthProvider>(context, listen: false).loadServices();
+      ApiService.getPanMasters();
     } catch (_) {}
   }
 

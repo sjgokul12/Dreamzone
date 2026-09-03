@@ -37,8 +37,8 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
   bool _fatherHasContent = false;
   bool _motherHasContent = false;
 
-  List<String> _titles = const ['Shri', 'Smt', 'Kumari', 'M/s'];
-  final List<String> _genders = const ["Male", "Female", "Transgender"];
+  List<String> _titles  = [];
+  List<String> _genders = [];
 
   String? _applicantTitle;
   String? _gender         = 'Male';
@@ -112,15 +112,17 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
 
   Future<void> _loadMasterDataFromApi() async {
     try {
-      final resTitles = await ApiService.fetchApi('/pan/titles').catchError((_) => http.Response('{}', 500));
+      final res = await ApiService.getPanMasters();
       if (!mounted) return;
-      if (resTitles.statusCode == 200) {
-        final dTitles = jsonDecode(resTitles.body) as Map<String, dynamic>;
-        if (dTitles['success'] == true && dTitles['titles'] is List) {
-          _titles = (dTitles['titles'] as List).map((e) => e.toString()).toList();
+
+      setState(() {
+        if (res['titles'] is List && (res['titles'] as List).isNotEmpty) {
+          _titles = (res['titles'] as List).map((e) => e.toString()).toList();
         }
-      }
-      setState(() {});
+        if (res['genders'] is List && (res['genders'] as List).isNotEmpty) {
+          _genders = (res['genders'] as List).map((e) => e.toString()).toList();
+        }
+      });
     } catch (_) {}
   }
 

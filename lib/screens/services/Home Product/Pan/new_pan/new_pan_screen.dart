@@ -38,30 +38,11 @@ class _NewPanScreenState extends State<NewPanScreen>
   bool _motherHasContent = false;
   bool _isMinor = false;
 
-  // Standard official PAN Masters (0ms instant render, zero loading spinners)
-  List<String> _titles = const ['Shri', 'Smt', 'Kumari', 'M/s'];
-  List<String> _categories = const [
-    'Individual',
-    'Hindu Undivided Family (HUF)',
-    'Company',
-    'Partnership Firm',
-    'Association of Persons (AOP)',
-    'Trust (AOP)',
-    'Body of Individuals (BOI)',
-    'Local Authority',
-    'Artificial Juridical Person',
-    'Government'
-  ];
-  List<String> _genders = const ['Male', 'Female', 'Transgender'];
-  List<String> _states = const [
-    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam',
-    'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu',
-    'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
-    'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh',
-    'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha',
-    'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
-    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
-  ];
+  // Dynamic Masters loaded from Database
+  List<String> _titles = [];
+  List<String> _categories = [];
+  List<String> _genders = [];
+  List<String> _states = [];
 
   String? _applicantTitle;
   String? _applicantCategory;
@@ -173,58 +154,23 @@ class _NewPanScreenState extends State<NewPanScreen>
 
   Future<void> _loadMasterDataFromApi() async {
     try {
-      final results = await Future.wait([
-        ApiService.fetchApi(
-          '/pan/titles',
-        ).catchError((_) => http.Response('{}', 500)),
-        ApiService.fetchApi(
-          '/pan/categories',
-        ).catchError((_) => http.Response('{}', 500)),
-        ApiService.fetchApi(
-          '/pan/genders',
-        ).catchError((_) => http.Response('{}', 500)),
-        ApiService.fetchApi(
-          '/pan/states',
-        ).catchError((_) => http.Response('{}', 500)),
-      ]);
-
+      final res = await ApiService.getPanMasters();
       if (!mounted) return;
 
-      final resTitles = results[0];
-      if (resTitles.statusCode == 200) {
-        final d = jsonDecode(resTitles.body);
-        if (d['success'] == true && d['titles'] is List) {
-          _titles = (d['titles'] as List).map((e) => e.toString()).toList();
+      setState(() {
+        if (res['titles'] is List && (res['titles'] as List).isNotEmpty) {
+          _titles = (res['titles'] as List).map((e) => e.toString()).toList();
         }
-      }
-
-      final resCats = results[1];
-      if (resCats.statusCode == 200) {
-        final d = jsonDecode(resCats.body);
-        if (d['success'] == true && d['categories'] is List) {
-          _categories = (d['categories'] as List)
-              .map((e) => e.toString())
-              .toList();
+        if (res['categories'] is List && (res['categories'] as List).isNotEmpty) {
+          _categories = (res['categories'] as List).map((e) => e.toString()).toList();
         }
-      }
-
-      final resGen = results[2];
-      if (resGen.statusCode == 200) {
-        final d = jsonDecode(resGen.body);
-        if (d['success'] == true && d['genders'] is List) {
-          _genders = (d['genders'] as List).map((e) => e.toString()).toList();
+        if (res['genders'] is List && (res['genders'] as List).isNotEmpty) {
+          _genders = (res['genders'] as List).map((e) => e.toString()).toList();
         }
-      }
-
-      final resStates = results[3];
-      if (resStates.statusCode == 200) {
-        final d = jsonDecode(resStates.body);
-        if (d['success'] == true && d['states'] is List) {
-          _states = (d['states'] as List).map((e) => e.toString()).toList();
+        if (res['states'] is List && (res['states'] as List).isNotEmpty) {
+          _states = (res['states'] as List).map((e) => e.toString()).toList();
         }
-      }
-
-      setState(() {});
+      });
     } catch (_) {}
   }
 
