@@ -38,11 +38,30 @@ class _CorrectionPanScreenState extends State<CorrectionPanScreen>
   bool _motherHasContent = false;
   bool _isMinor = false;
 
-  // Dynamic Masters from Database API
-  List<String> _titles     = [];
-  List<String> _categories = [];
-  List<String> _genders    = [];
-  List<String> _states     = [];
+  // Standard official PAN Masters (0ms instant render, zero loading spinners)
+  List<String> _titles = const ['Shri', 'Smt', 'Kumari', 'M/s'];
+  List<String> _categories = const [
+    'Individual',
+    'Hindu Undivided Family (HUF)',
+    'Company',
+    'Partnership Firm',
+    'Association of Persons (AOP)',
+    'Trust (AOP)',
+    'Body of Individuals (BOI)',
+    'Local Authority',
+    'Artificial Juridical Person',
+    'Government'
+  ];
+  List<String> _genders = const ['Male', 'Female', 'Transgender'];
+  List<String> _states = const [
+    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam',
+    'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir',
+    'Jharkhand', 'Karnataka', 'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh',
+    'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha',
+    'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana',
+    'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+  ];
 
   String? _applicantTitle;
   String? _applicantCategory;

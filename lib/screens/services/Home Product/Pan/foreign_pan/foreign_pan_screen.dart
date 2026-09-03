@@ -37,8 +37,8 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
   bool _fatherHasContent = false;
   bool _motherHasContent = false;
 
-  List<String> _titles  = [];
-  final List<String> _genders = ["Male", "Female", "Transgender"];
+  List<String> _titles = const ['Shri', 'Smt', 'Kumari', 'M/s'];
+  final List<String> _genders = const ["Male", "Female", "Transgender"];
 
   String? _applicantTitle;
   String? _gender         = 'Male';

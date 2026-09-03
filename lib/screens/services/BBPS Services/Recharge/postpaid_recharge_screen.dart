@@ -81,12 +81,43 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   void _onMobileChanged(String value) {
     String clean = value.replaceAll('+91', '').replaceAll(' ', '').trim();
     if (clean.length == 10) {
+      // 1. Instant 0ms Series Auto-Resolution (Zero Waiting, Zero Lag!)
+      final offline = PrepaidApiService.resolveSeriesOffline(clean);
+      if (offline['success'] == true) {
+        final detectedOp = (offline['operator'] ?? '').toString().trim().toLowerCase();
+        if (detectedOp.isNotEmpty && _operators.isNotEmpty) {
+          final match = _operators.firstWhere(
+            (o) {
+              final lbl = (o['label'] ?? o['name'] ?? '').toString().toLowerCase();
+              final code = (o['code'] ?? '').toString().toLowerCase();
+              if (detectedOp.contains('jio') && (lbl.contains('jio') || code.contains('jio'))) return true;
+              if (detectedOp.contains('airtel') && (lbl.contains('airtel') || code.contains('airtel'))) return true;
+              if ((detectedOp.contains('vi') || detectedOp.contains('voda') || detectedOp.contains('idea')) &&
+                  (lbl.contains('vi') || lbl.contains('voda') || lbl.contains('idea') || code.contains('vi') || code.contains('voda') || code.contains('idea'))) {
+                return true;
+              }
+              if (detectedOp.contains('bsnl') && (lbl.contains('bsnl') || code.contains('bsnl'))) return true;
+              if (detectedOp.contains('mtnl') && (lbl.contains('mtnl') || code.contains('mtnl'))) return true;
+              return lbl.contains(detectedOp) || detectedOp.contains(lbl);
+            },
+            orElse: () => <String, dynamic>{},
+          );
+
+          if (match.isNotEmpty) {
+            setState(() {
+              _selectedOperator = (match['label'] ?? match['name'])?.toString();
+              _isAutoDetecting = false;
+            });
+          }
+        }
+      }
+
+      // 2. Non-blocking live check for ported numbers
       _autoDetectOperator(clean);
     }
   }
 
   Future<void> _autoDetectOperator(String cleanMobile) async {
-    setState(() => _isAutoDetecting = true);
 
     try {
       final res = await PrepaidApiService.fetchOperatorAndCircle(cleanMobile);

@@ -106,6 +106,44 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
   void _onMobileChanged(String value) {
     final clean = value.replaceAll('+91', '').replaceAll(' ', '').trim();
     if (clean.length == 10) {
+      // 1. Instant 0ms Series Auto-Resolution (Zero Waiting, Zero Lag!)
+      final offline = PrepaidApiService.resolveSeriesOffline(clean);
+      if (offline['success'] == true) {
+        final detectedOp = (offline['operator'] ?? '').toString().trim();
+        final detectedCircle = (offline['circle'] ?? '').toString().trim();
+        final detectedOpCode = (offline['opcode'] ?? '').toString().trim();
+        final detectedCircleCode = (offline['circle_code'] ?? '').toString().trim();
+
+        final match = _operators.firstWhere(
+          (o) {
+            final lbl = (o['label'] ?? o['name'] ?? '').toString().toLowerCase();
+            final code = (o['code'] ?? '').toString().toLowerCase();
+            final d = detectedOp.toLowerCase();
+            return lbl.contains(d) || d.contains(lbl) || code.contains(d) || d.contains(code);
+          },
+          orElse: () => <String, dynamic>{},
+        );
+
+        final matchCirc = _circles.firstWhere(
+          (c) {
+            final cl = c.toLowerCase();
+            final dc = detectedCircle.toLowerCase();
+            return cl.contains(dc) || dc.contains(cl);
+          },
+          orElse: () => detectedCircle,
+        );
+
+        setState(() {
+          _selectedOperator = match.isNotEmpty ? (match['label'] ?? match['name'])?.toString() : detectedOp;
+          _detectedOpCode = match.isNotEmpty ? (match['spkey'] ?? match['code'] ?? match['id'])?.toString() : detectedOpCode;
+          _selectedCircle = matchCirc;
+          _detectedCircleCode = detectedCircleCode.isNotEmpty ? detectedCircleCode : matchCirc;
+          _autoDetected = true;
+          _isAutoDetecting = false;
+        });
+      }
+
+      // 2. Non-blocking live check for ported SIMs
       _autoDetectOperatorAndCircle(clean);
     } else {
       if (_autoDetected) {
@@ -115,7 +153,6 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
   }
 
   Future<void> _autoDetectOperatorAndCircle(String mobile) async {
-    setState(() => _isAutoDetecting = true);
 
     try {
       final res = await PrepaidApiService.fetchOperatorAndCircle(mobile);
