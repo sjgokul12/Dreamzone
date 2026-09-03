@@ -37,8 +37,9 @@ class _ForeignPanScreenState extends State<ForeignPanScreen>
   bool _fatherHasContent = false;
   bool _motherHasContent = false;
 
-  List<String> _titles  = [];
-  List<String> _genders = [];
+  // Dynamic Masters loaded from Database with instant default fallback
+  List<String> _titles  = List<String>.from(ApiService.defaultTitles);
+  List<String> _genders = List<String>.from(ApiService.defaultGenders);
 
   String? _applicantTitle;
   String? _gender         = 'Male';

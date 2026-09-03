@@ -29,10 +29,18 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   final TextEditingController _amountCtrl = TextEditingController();
   final ApiService _api = ApiService();
 
-  // All postpaid operators loaded dynamically from Python database API
-  List<Map<String, dynamic>> _operators = [];
+  static const List<Map<String, dynamic>> _defaultPostpaidOperators = [
+    {'name': 'Reliance Jio Postpaid', 'code': '11', 'label': 'Reliance Jio Postpaid', 'spkey': 'JIOPOST'},
+    {'name': 'Airtel Postpaid', 'code': '1', 'label': 'Airtel Postpaid', 'spkey': 'AIRTELPOST'},
+    {'name': 'Vodafone Idea (Vi) Postpaid', 'code': '19', 'label': 'Vodafone Idea (Vi) Postpaid', 'spkey': 'VIPOST'},
+    {'name': 'BSNL Postpaid', 'code': '4', 'label': 'BSNL Postpaid', 'spkey': 'BSNLPOST'},
+    {'name': 'MTNL Dolphin Postpaid', 'code': '10', 'label': 'MTNL Dolphin Postpaid', 'spkey': 'MTNLPOST'},
+  ];
+
+  // All postpaid operators loaded dynamically from Database API with instant default fallback
+  List<Map<String, dynamic>> _operators = List<Map<String, dynamic>>.from(_defaultPostpaidOperators);
   String? _selectedOperator;
-  bool _loadingOperators = true;
+  bool _loadingOperators = false;
   bool _isAutoDetecting = false;
 
   bool _fetchingBill = false;
@@ -53,21 +61,14 @@ class _PostpaidRechargeScreenState extends State<PostpaidRechargeScreen> {
   }
 
   Future<void> _loadDatabaseData() async {
-    setState(() => _loadingOperators = true);
-
     try {
       final res = await _api.getRechargeOperators('postpaid');
-      if (mounted) {
+      if (mounted && res['success'] == true && res['operators'] is List && (res['operators'] as List).isNotEmpty) {
         setState(() {
-          if (res['success'] == true && res['operators'] != null) {
-            _operators = List<Map<String, dynamic>>.from(res['operators']);
-          }
-          _loadingOperators = false;
+          _operators = List<Map<String, dynamic>>.from(res['operators']);
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingOperators = false);
-    }
+    } catch (_) {}
   }
 
   @override

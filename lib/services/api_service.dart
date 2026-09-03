@@ -539,17 +539,43 @@ class ApiService {
     }
   }
 
+  /// Standard PAN Database Masters (Matches MySQL seeded tables)
+  static const List<String> defaultTitles = ['Shri', 'Smt.', 'Kumari', 'M/s'];
+  static const List<String> defaultCategories = [
+    'Individual',
+    'Body of Individuals (BOI)',
+    'Partnership Firm',
+    'Government',
+    'Association of Persons (AOP)',
+    'Trust (AOP)',
+    'Hindu undivided family (HUF)',
+    'Company'
+  ];
+  static const List<String> defaultGenders = ['Male', 'Female', 'Transgender'];
+  static const List<String> defaultStates = [
+    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam',
+    'Bihar', 'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli', 'Daman and Diu', 'Delhi',
+    'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand',
+    'Karnataka', 'Kenmore', 'Kerala', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra',
+    'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Narora', 'Natwar', 'Odisha',
+    'Paschim Medinipur', 'Pondicherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'Vaishali', 'West Bengal'
+  ];
+
   /// Dynamic PAN Masters cache from Database
-  static Map<String, dynamic>? _cachedPanMasters;
+  static Map<String, dynamic>? _cachedPanMasters = {
+    'success': true,
+    'titles': defaultTitles,
+    'categories': defaultCategories,
+    'genders': defaultGenders,
+    'states': defaultStates,
+  };
 
   /// Fetches PAN Master lists (Titles, Categories, Genders, States) from Database.
   static Future<Map<String, dynamic>> getPanMasters() async {
-    if (_cachedPanMasters != null && _cachedPanMasters!['success'] == true) {
-      return _cachedPanMasters!;
-    }
-
+    // 1. Try unified masters route
     try {
-      final res = await fetchApi('/pan/masters', timeoutSeconds: 5);
+      final res = await fetchApi('/pan/masters', timeoutSeconds: 4);
       if (res.statusCode == 200) {
         final d = jsonDecode(res.body);
         if (d['success'] == true) {
@@ -559,13 +585,13 @@ class ApiService {
       }
     } catch (_) {}
 
-    // Fallback to individual routes
+    // 2. Try individual routes
     try {
       final results = await Future.wait([
-        fetchApi('/pan/titles', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/categories', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/genders', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
-        fetchApi('/pan/states', timeoutSeconds: 4).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/titles', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/categories', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/genders', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
+        fetchApi('/pan/states', timeoutSeconds: 3).catchError((_) => http.Response('{}', 500)),
       ]);
 
       final titles = <String>[];
@@ -575,35 +601,47 @@ class ApiService {
 
       if (results[0].statusCode == 200) {
         final d = jsonDecode(results[0].body);
-        if (d['titles'] is List) titles.addAll((d['titles'] as List).map((e) => e.toString()));
+        if (d['titles'] is List && (d['titles'] as List).isNotEmpty) {
+          titles.addAll((d['titles'] as List).map((e) => e.toString()));
+        }
       }
       if (results[1].statusCode == 200) {
         final d = jsonDecode(results[1].body);
-        if (d['categories'] is List) categories.addAll((d['categories'] as List).map((e) => e.toString()));
+        if (d['categories'] is List && (d['categories'] as List).isNotEmpty) {
+          categories.addAll((d['categories'] as List).map((e) => e.toString()));
+        }
       }
       if (results[2].statusCode == 200) {
         final d = jsonDecode(results[2].body);
-        if (d['genders'] is List) genders.addAll((d['genders'] as List).map((e) => e.toString()));
+        if (d['genders'] is List && (d['genders'] as List).isNotEmpty) {
+          genders.addAll((d['genders'] as List).map((e) => e.toString()));
+        }
       }
       if (results[3].statusCode == 200) {
         final d = jsonDecode(results[3].body);
-        if (d['states'] is List) states.addAll((d['states'] as List).map((e) => e.toString()));
+        if (d['states'] is List && (d['states'] as List).isNotEmpty) {
+          states.addAll((d['states'] as List).map((e) => e.toString()));
+        }
       }
 
-      final combined = {
-        'success': true,
-        'titles': titles,
-        'categories': categories,
-        'genders': genders,
-        'states': states,
-      };
-      if (titles.isNotEmpty || categories.isNotEmpty) {
-        _cachedPanMasters = combined;
+      if (titles.isNotEmpty && categories.isNotEmpty) {
+        _cachedPanMasters = {
+          'success': true,
+          'titles': titles,
+          'categories': categories,
+          'genders': genders.isNotEmpty ? genders : defaultGenders,
+          'states': states.isNotEmpty ? states : defaultStates,
+        };
       }
-      return combined;
-    } catch (_) {
-      return {'success': false, 'titles': <String>[], 'categories': <String>[], 'genders': <String>[], 'states': <String>[]};
-    }
+    } catch (_) {}
+
+    return _cachedPanMasters ?? {
+      'success': true,
+      'titles': defaultTitles,
+      'categories': defaultCategories,
+      'genders': defaultGenders,
+      'states': defaultStates,
+    };
   }
 }
 
