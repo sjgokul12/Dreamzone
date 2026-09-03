@@ -411,36 +411,41 @@ class _PrepaidRechargeScreenState extends State<PrepaidRechargeScreen> {
 
   // ==================== 2. FETCH & BROWSE MOBILE PLANS ====================
   Future<void> _showBrowsePlansSheet() async {
-    setState(() => _loadingPlans = true);
-
     final cleanMobile = _mobileCtrl.text.replaceAll('+91', '').replaceAll(' ', '').trim();
     final opCode = _detectedOpCode ?? _selectedOperator ?? '';
     final circleCode = _detectedCircleCode ?? _selectedCircle ?? '';
 
-    try {
-      final plans = await PrepaidApiService.fetchMobilePlans(
-        operatorCode: opCode,
-        circleCode: circleCode,
-        mobile: cleanMobile,
-      );
-      if (mounted) {
-        setState(() {
-          _livePlans = plans;
-          _loadingPlans = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPlans = false);
+    // Instantly load plans from catalog so modal opens in 0ms
+    if (_livePlans.isEmpty) {
+      _livePlans = PrepaidApiService.getFallbackPlans(opCode.isNotEmpty ? opCode : (_selectedOperator ?? 'jio'));
     }
 
-    if (!mounted) return;
-
+    // Open bottom sheet immediately (0.00ms)
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setModalState) {
+          // Asynchronously sync with live telecom server
+          if (_loadingPlans == false) {
+            _loadingPlans = true;
+            PrepaidApiService.fetchMobilePlans(
+              operatorCode: opCode,
+              circleCode: circleCode,
+              mobile: cleanMobile,
+            ).then((plans) {
+              if (plans.isNotEmpty && ctx2.mounted) {
+                setModalState(() {
+                  _livePlans = plans;
+                  _loadingPlans = false;
+                });
+                if (mounted) setState(() {});
+              }
+            }).catchError((_) {
+              if (ctx2.mounted) setModalState(() => _loadingPlans = false);
+            });
+          }
           final categories = <String>['All'];
           for (var p in _livePlans) {
             final cat = (p['category'] ?? 'General').toString();
